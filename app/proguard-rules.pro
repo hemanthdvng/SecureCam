@@ -7,4 +7,3 @@
 -dontwarn okhttp3.**
 -keep class okhttp3.** { *; }
 -keep class com.securecam.** { *; }
--keep class com.google.gson.** { *; }
