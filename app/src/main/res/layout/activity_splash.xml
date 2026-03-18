@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center"
+    android:background="@color/colorPrimary" android:padding="40dp">
+    <ImageView android:id="@+id/logoImage" android:layout_width="100dp" android:layout_height="100dp"
+        android:src="@android:drawable/ic_menu_camera" android:tint="@color/colorAccent" android:contentDescription="Logo"/>
+    <TextView android:id="@+id/appNameText" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="20dp" android:text="SecureCam" android:textColor="@color/colorTextPrimary"
+        android:textSize="36sp" android:textStyle="bold"/>
+    <TextView android:id="@+id/taglineText" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:text="Secure • Smart • Real-Time"
+        android:textColor="@color/colorAccent" android:textSize="14sp"/>
+    <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="60dp" android:indeterminateTint="@color/colorAccent"/>
+</LinearLayout>
