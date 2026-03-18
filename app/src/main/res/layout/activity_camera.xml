@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/black">
+    <org.webrtc.SurfaceViewRenderer android:id="@+id/localVideoView"
+        android:layout_width="match_parent" android:layout_height="match_parent"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:padding="12dp" android:background="@color/overlay_dark"
+        android:gravity="center_vertical">
+        <View android:id="@+id/statusDot" android:layout_width="10dp" android:layout_height="10dp"
+            android:background="@android:drawable/presence_busy" android:layout_marginEnd="8dp"/>
+        <TextView android:id="@+id/tvStatus" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="Initializing…" android:textColor="@color/colorTextPrimary" android:textSize="13sp"/>
+        <TextView android:id="@+id/tvConnectionType" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="WEBRTC" android:textColor="@color/colorAccent" android:textSize="11sp" android:textStyle="bold"
+            android:background="@color/colorCard" android:padding="4dp"/>
+        <TextView android:id="@+id/tvRoomCode" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="8dp" android:text="Room: ——" android:textColor="@color/colorTextSecondary" android:textSize="12sp"/>
+    </LinearLayout>
+    <TextView android:id="@+id/tvMotionAlert" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal" android:layout_marginTop="60dp"
+        android:text="⚠️ Motion Detected!" android:textColor="@color/white" android:textSize="16sp" android:textStyle="bold"
+        android:background="#CCFF3B3B" android:padding="10dp" android:visibility="gone"/>
+    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="top|start" android:layout_marginTop="56dp" android:layout_marginStart="12dp"
+        android:orientation="vertical">
+        <TextView android:id="@+id/tvObjectLabel" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="🔍 Person" android:textColor="@color/white" android:textSize="13sp"
+            android:background="#BB00FF88" android:padding="6dp" android:visibility="gone"/>
+        <TextView android:id="@+id/tvFaceLabel" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:text="👤 1 face" android:textColor="@color/white" android:textSize="13sp"
+            android:background="#BB00D4FF" android:padding="6dp" android:visibility="gone"/>
+        <TextView android:id="@+id/tvNightMode" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:text="🌙 Night Mode" android:textColor="@color/white" android:textSize="13sp"
+            android:background="#BB6E40C9" android:padding="6dp" android:visibility="gone"/>
+    </LinearLayout>
+    <TextView android:id="@+id/tvViewerStatus" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="top|end" android:layout_marginTop="56dp" android:layout_marginEnd="12dp"
+        android:textColor="@color/colorAccentGreen" android:textSize="12sp"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="bottom" android:layout_marginBottom="90dp"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingStart="12dp" android:paddingEnd="12dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Motion" android:textColor="@color/colorTextSecondary" android:textSize="11sp" android:layout_marginEnd="8dp"/>
+        <ProgressBar android:id="@+id/motionBar" style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="6dp"
+            android:progressTint="@color/motion_color" android:progressBackgroundTint="@color/colorBorder" android:max="100"/>
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="80dp"
+        android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center"
+        android:background="@color/overlay_dark" android:padding="12dp">
+        <ImageButton android:id="@+id/btnSwitchCamera" android:layout_width="48dp" android:layout_height="48dp"
+            android:layout_marginEnd="12dp" android:src="@android:drawable/ic_menu_rotate"
+            android:tint="@color/white" android:background="@color/colorCard" android:contentDescription="Switch"/>
+        <ImageButton android:id="@+id/btnMute" android:layout_width="48dp" android:layout_height="48dp"
+            android:layout_marginEnd="12dp" android:src="@android:drawable/ic_lock_silent_mode_off"
+            android:tint="@color/white" android:background="@color/colorCard" android:contentDescription="Mute"/>
+        <ImageButton android:id="@+id/btnVideoOff" android:layout_width="48dp" android:layout_height="48dp"
+            android:layout_marginEnd="12dp" android:src="@android:drawable/ic_menu_camera"
+            android:tint="@color/white" android:background="@color/colorCard" android:contentDescription="Video"/>
+        <ImageButton android:id="@+id/btnTorch" android:layout_width="48dp" android:layout_height="48dp"
+            android:layout_marginEnd="12dp" android:alpha="0.5" android:src="@android:drawable/star_big_on"
+            android:tint="@color/colorAccentOrange" android:background="@color/colorCard" android:contentDescription="Torch"/>
+        <ImageButton android:id="@+id/btnNightMode" android:layout_width="48dp" android:layout_height="48dp"
+            android:layout_marginEnd="12dp" android:alpha="0.5" android:src="@android:drawable/ic_menu_today"
+            android:tint="@color/night_color" android:background="@color/colorCard" android:contentDescription="Night"/>
+        <Button android:id="@+id/btnEndStream" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="END" android:textColor="@color/white" android:backgroundTint="@color/colorAccentRed"
+            style="@style/Widget.MaterialComponents.Button"/>
+    </LinearLayout>
+</FrameLayout>
