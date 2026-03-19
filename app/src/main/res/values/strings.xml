@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SecureCam</string>
+    <string name="tagline">Secure • Smart • Real-Time</string>
+    <string name="btn_camera_mode">📷 Camera Mode</string>
+    <string name="btn_viewer_mode">👁 Viewer Mode</string>
+    <string name="btn_settings">⚙️ Settings</string>
+    <string name="enter_room_code">Enter Room Code</string>
+    <string name="generate_code">Generate</string>
+    <string name="start">Start</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="waiting_for_peer">Waiting for peer…</string>
+    <string name="motion_detected">Motion Detected!</string>
+    <string name="settings_title">Settings</string>
+    <string name="motion_alerts">Motion Alerts</string>
+    <string name="face_detection">Face Detection</string>
+    <string name="object_detection">Object Detection (TFLite)</string>
+    <string name="night_mode">Night Mode</string>
+    <string name="auto_night_mode">Auto Night Mode</string>
+    <string name="audio_stream">Audio Streaming</string>
+    <string name="flash_on_motion">Flash on Motion</string>
+    <string name="motion_sensitivity">Motion Sensitivity</string>
+    <string name="video_quality">Video Quality</string>
+    <string name="signaling_server">Signaling Server URL</string>
+    <string name="save">Save</string>
+    <string name="saved">Saved ✓</string>
+</resources>
