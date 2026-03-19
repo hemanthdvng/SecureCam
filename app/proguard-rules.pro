@@ -1,0 +1,10 @@
+-keep class org.webrtc.** { *; }
+-dontwarn org.webrtc.**
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+-keep class org.tensorflow.** { *; }
+-dontwarn org.tensorflow.**
+-dontwarn okhttp3.**
+-keep class okhttp3.** { *; }
+-keep class com.securecam.** { *; }
+-keep class com.google.gson.** { *; }
