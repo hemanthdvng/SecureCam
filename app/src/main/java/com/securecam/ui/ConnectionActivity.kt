@@ -3,7 +3,6 @@ package com.securecam.ui
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.securecam.camera.CameraActivity
 import com.securecam.databinding.ActivityConnectionBinding
@@ -14,8 +13,8 @@ import java.util.UUID
 class ConnectionActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityConnectionBinding
-    private var mode: String = MODE_CAMERA
-    private var connectionType: String = TYPE_WEBRTC
+    private var mode = MODE_CAMERA
+    private var connectionType = TYPE_WEBRTC
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,23 +28,24 @@ class ConnectionActivity : AppCompatActivity() {
     }
 
     private fun setupUI(prefilledRoom: String) {
-        // Title based on mode
         binding.tvTitle.text = if (mode == MODE_CAMERA) "📷 Camera Mode" else "👁️ Viewer Mode"
         binding.tvSubtitle.text = if (mode == MODE_CAMERA)
             "This phone will stream video" else "This phone will receive video"
 
-        // Pre-fill room code if available
-        if (prefilledRoom.isNotEmpty()) {
-            binding.etRoomCode.setText(prefilledRoom)
+        // Pre-fill last room code
+        val lastRoom = prefilledRoom.ifEmpty { AppPreferences.lastRoomCode }
+        if (lastRoom.isNotEmpty()) binding.etRoomCode.setText(lastRoom)
+
+        // Pre-fill server URL from Settings if saved
+        val savedServer = AppPreferences.customSignalingServer
+        if (savedServer.isNotEmpty()) {
+            binding.etServerUrl.setText(savedServer)
         }
 
-        // Generate random room code button
         binding.btnGenerate.setOnClickListener {
-            val code = UUID.randomUUID().toString().take(8).uppercase()
-            binding.etRoomCode.setText(code)
+            binding.etRoomCode.setText(UUID.randomUUID().toString().take(8).uppercase())
         }
 
-        // Connection type toggle
         binding.rgConnectionType.setOnCheckedChangeListener { _, checkedId ->
             connectionType = when (checkedId) {
                 binding.rbWebRTC.id -> TYPE_WEBRTC
@@ -55,26 +55,43 @@ class ConnectionActivity : AppCompatActivity() {
             updateServerUrlVisibility()
         }
 
-        // Default to WebRTC
+        // Default WebRTC
         binding.rbWebRTC.isChecked = true
         updateServerUrlVisibility()
 
-        // Start button
         binding.btnStart.setOnClickListener {
             val roomCode = binding.etRoomCode.text.toString().trim()
-            val serverUrl = binding.etServerUrl.text.toString().trim()
-
             if (roomCode.isEmpty()) {
                 binding.etRoomCode.error = "Enter a room code"
                 return@setOnClickListener
             }
 
-            if (connectionType == TYPE_WEBSOCKET && serverUrl.isEmpty()) {
-                binding.etServerUrl.error = "Enter server URL for WebSocket mode"
+            // Build server URL — priority:
+            // 1. Manually typed in this screen
+            // 2. Saved in Settings (AppPreferences)
+            // 3. Hardcoded fallback (should never be used in production)
+            val typedUrl = binding.etServerUrl.text.toString().trim()
+            val savedUrl = AppPreferences.customSignalingServer
+            val finalUrl = when {
+                typedUrl.isNotEmpty() -> typedUrl
+                savedUrl.isNotEmpty() -> savedUrl
+                else -> DEFAULT_SIGNALING_URL
+            }
+
+            // WebSocket mode requires a server URL
+            if (connectionType == TYPE_WEBSOCKET && finalUrl == DEFAULT_SIGNALING_URL) {
+                binding.etServerUrl.error = "Enter your server URL"
+                binding.etServerUrl.visibility = View.VISIBLE
+                binding.tvServerUrlLabel.visibility = View.VISIBLE
                 return@setOnClickListener
             }
 
             AppPreferences.lastRoomCode = roomCode
+
+            // Also save the server URL if user typed one
+            if (typedUrl.isNotEmpty()) {
+                AppPreferences.customSignalingServer = typedUrl
+            }
 
             val intent = if (mode == MODE_CAMERA) {
                 Intent(this, CameraActivity::class.java)
@@ -82,14 +99,10 @@ class ConnectionActivity : AppCompatActivity() {
                 Intent(this, ViewerActivity::class.java)
             }
 
-            intent.apply {
-                putExtra(EXTRA_MODE, mode)
-                putExtra(EXTRA_ROOM_CODE, roomCode)
-                putExtra(EXTRA_CONNECTION_TYPE, connectionType)
-                putExtra(EXTRA_SERVER_URL, serverUrl.ifEmpty {
-                    DEFAULT_SIGNALING_URL
-                })
-            }
+            intent.putExtra(EXTRA_MODE, mode)
+            intent.putExtra(EXTRA_ROOM_CODE, roomCode)
+            intent.putExtra(EXTRA_CONNECTION_TYPE, connectionType)
+            intent.putExtra(EXTRA_SERVER_URL, finalUrl)
 
             startActivity(intent)
         }
@@ -98,12 +111,20 @@ class ConnectionActivity : AppCompatActivity() {
     }
 
     private fun updateServerUrlVisibility() {
-        binding.tvServerUrlLabel.visibility =
-            if (connectionType == TYPE_WEBSOCKET) View.VISIBLE else View.GONE
-        binding.etServerUrl.visibility =
-            if (connectionType == TYPE_WEBSOCKET) View.VISIBLE else View.GONE
-        binding.tvSignalingNote.visibility =
-            if (connectionType == TYPE_WEBRTC) View.VISIBLE else View.GONE
+        val isWS = connectionType == TYPE_WEBSOCKET
+        binding.tvServerUrlLabel.visibility = if (isWS) View.VISIBLE else View.GONE
+        binding.etServerUrl.visibility = if (isWS) View.VISIBLE else View.GONE
+        binding.tvSignalingNote.visibility = if (isWS) View.GONE else View.VISIBLE
+
+        // For WebRTC, show the saved URL as a hint so user knows it's being used
+        if (!isWS) {
+            val saved = AppPreferences.customSignalingServer
+            if (saved.isNotEmpty()) {
+                binding.tvSignalingNote.text = "ℹ️ Using server: $saved"
+            } else {
+                binding.tvSignalingNote.text = "ℹ️ Go to Settings and enter your server URL"
+            }
+        }
     }
 
     companion object {
@@ -111,13 +132,10 @@ class ConnectionActivity : AppCompatActivity() {
         const val MODE_VIEWER = "viewer"
         const val TYPE_WEBRTC = "webrtc"
         const val TYPE_WEBSOCKET = "websocket"
-
         const val EXTRA_MODE = "extra_mode"
         const val EXTRA_ROOM_CODE = "extra_room_code"
         const val EXTRA_CONNECTION_TYPE = "extra_connection_type"
         const val EXTRA_SERVER_URL = "extra_server_url"
-
-        // Default signaling server — replace with your deployed server URL
         const val DEFAULT_SIGNALING_URL = "wss://your-signaling-server.com"
     }
 }
