@@ -14,6 +14,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.securecam.ai.AIProcessor
@@ -41,47 +42,35 @@ class CameraActivity : AppCompatActivity(),
     private var roomCode = ""
     private var connectionType = ""
     private var serverUrl = ""
+
     private var webRTCManager: WebRTCManager? = null
     private var signalingClient: SignalingClient? = null
     private var wsStream: WebSocketStreamManager? = null
     private var ai: AIProcessor? = null
     private var night: NightModeHelper? = null
+
     private var isBackCamera = true
     private var isStreaming = false
     private var cameraProvider: ProcessCameraProvider? = null
     private var exec: ExecutorService? = null
-
-    // Global exception handler — shows error instead of crashing
-    private val exceptionHandler = Thread.UncaughtExceptionHandler { _, throwable ->
-        Log.e(TAG, "UNCAUGHT: ${throwable.message}", throwable)
-        Handler(Looper.getMainLooper()).post {
-            try {
-                Toast.makeText(this, "Error: ${throwable.message?.take(100)}", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {}
-        }
-    }
+    private var torchEnabled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        Thread.currentThread().uncaughtExceptionHandler = exceptionHandler
         super.onCreate(savedInstanceState)
-
         try {
             binding = ActivityCameraBinding.inflate(layoutInflater)
             setContentView(binding.root)
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } catch (e: Exception) {
-            Log.e(TAG, "Binding failed: ${e.message}")
-            Toast.makeText(this, "Layout error: ${e.message}", Toast.LENGTH_LONG).show()
-            finish()
-            return
+            Log.e(TAG, "Binding: ${e.message}")
+            finish(); return
         }
 
         roomCode = intent.getStringExtra(ConnectionActivity.EXTRA_ROOM_CODE) ?: ""
         connectionType = intent.getStringExtra(ConnectionActivity.EXTRA_CONNECTION_TYPE) ?: ConnectionActivity.TYPE_WEBRTC
         serverUrl = intent.getStringExtra(ConnectionActivity.EXTRA_SERVER_URL) ?: ""
 
-        Log.d(TAG, "room=$roomCode type=$connectionType url=$serverUrl android=${Build.VERSION.SDK_INT}")
-
+        Log.d(TAG, "room=$roomCode type=$connectionType server=$serverUrl")
         exec = Executors.newSingleThreadExecutor()
         setupUI()
 
@@ -89,66 +78,109 @@ class CameraActivity : AppCompatActivity(),
             updateStatus("Requesting permissions...", false)
             PermissionHelper.requestPermissions(this)
         } else {
-            // Delay init slightly so UI renders first — prevents blank screen crash
-            Handler(Looper.getMainLooper()).postDelayed({ init() }, 300)
+            Handler(Looper.getMainLooper()).postDelayed({ init() }, 200)
         }
     }
 
     private fun init() {
-        updateStatus("Starting...", false)
+        updateStatus("Starting camera...", false)
 
         // Start foreground service
         try {
             val si = Intent(this, CameraStreamingService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(si)
-            } else {
-                startService(si)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Service: ${e.message}")
-            // Not fatal — continue anyway
-        }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(si)
+            else startService(si)
+        } catch (e: Exception) { Log.e(TAG, "Service: ${e.message}") }
 
         // Init AI
-        try {
-            ai = AIProcessor(this)
-            ai?.initialize()
-        } catch (e: Exception) {
-            Log.e(TAG, "AI init: ${e.message}")
-        }
+        try { ai = AIProcessor(this); ai?.initialize() } catch (e: Exception) { Log.e(TAG, "AI: ${e.message}") }
 
         // Init night mode
-        try {
-            night = NightModeHelper(this)
-        } catch (e: Exception) {
-            Log.e(TAG, "Night: ${e.message}")
-        }
+        try { night = NightModeHelper(this) } catch (e: Exception) { Log.e(TAG, "Night: ${e.message}") }
 
-        // Start camera first — most important
-        startAnalysisCamera()
+        // Start camera preview + analysis first (most important — shows video)
+        startCamera()
 
-        // Then connect to server
+        // Connect to server after camera is up
         Handler(Looper.getMainLooper()).postDelayed({
             try {
                 if (connectionType == ConnectionActivity.TYPE_WEBRTC) initWebRTC()
                 else initWS()
             } catch (e: Exception) {
                 Log.e(TAG, "Connection: ${e.message}")
-                updateStatus("Server error: ${e.message?.take(50)}", false)
+                updateStatus("⚠️ Server error: ${e.message?.take(50)}", false)
             }
-        }, 500)
+        }, 800)
+    }
+
+    private fun startCamera() {
+        val execLocal = exec ?: return
+        val fut = ProcessCameraProvider.getInstance(this)
+        fut.addListener({
+            try {
+                cameraProvider = fut.get()
+
+                // Preview use case — THIS is what shows the camera feed on screen
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(binding.cameraPreviewView.surfaceProvider)
+                }
+
+                // Analysis use case — for AI processing
+                val analysis = ImageAnalysis.Builder()
+                    .setTargetResolution(Size(640, 480))
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build().also { ia ->
+                        ia.setAnalyzer(execLocal) { proxy ->
+                            try {
+                                val bmp = proxy.toBitmap()
+                                ai?.processFrame(bmp)
+                                night?.analyzeFrameBrightness(bmp)
+                                // WebSocket relay — send frames to viewer
+                                if (connectionType == ConnectionActivity.TYPE_WEBSOCKET && isStreaming)
+                                    wsStream?.sendFrame(bmp)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Frame: ${e.message}")
+                            } finally {
+                                proxy.close()
+                            }
+                        }
+                    }
+
+                val selector = if (isBackCamera) CameraSelector.DEFAULT_BACK_CAMERA
+                else CameraSelector.DEFAULT_FRONT_CAMERA
+
+                cameraProvider?.unbindAll()
+
+                // Bind BOTH preview and analysis to lifecycle
+                val cam = cameraProvider?.bindToLifecycle(this, selector, preview, analysis)
+                cam?.let {
+                    night?.attachCamera(it)
+                    // Update torch button state
+                    binding.btnTorch.setOnClickListener {
+                        torchEnabled = !torchEnabled
+                        cam.cameraControl.enableTorch(torchEnabled)
+                        binding.btnTorch.alpha = if (torchEnabled) 1f else 0.5f
+                    }
+                }
+
+                updateStatus("📷 Ready — waiting for viewer...", false)
+                Log.d(TAG, "Camera preview + analysis started OK")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Camera bind: ${e.message}")
+                runOnUiThread { updateStatus("❌ Camera error: ${e.message?.take(60)}", false) }
+            }
+        }, ContextCompat.getMainExecutor(this))
     }
 
     private fun setupUI() {
         binding.tvRoomCode.text = "Room: $roomCode"
         binding.tvConnectionType.text = if (connectionType == ConnectionActivity.TYPE_WEBRTC) "WEBRTC" else "RELAY"
-        updateStatus("Waiting...", false)
+        updateStatus("Initializing...", false)
 
         binding.btnSwitchCamera.setOnClickListener {
             isBackCamera = !isBackCamera
-            webRTCManager?.switchCamera()
-            startAnalysisCamera()
+            startCamera() // Restart with new camera
         }
         binding.btnMute.setOnClickListener {
             val muted = binding.btnMute.alpha < 0.7f
@@ -156,14 +188,15 @@ class CameraActivity : AppCompatActivity(),
             binding.btnMute.alpha = if (muted) 1f else 0.4f
         }
         binding.btnVideoOff.setOnClickListener {
-            val off = binding.btnVideoOff.alpha < 0.7f
-            webRTCManager?.setVideoEnabled(off)
-            binding.btnVideoOff.alpha = if (off) 1f else 0.4f
+            val visible = binding.btnVideoOff.alpha > 0.7f
+            // Toggle preview visibility
+            binding.cameraPreviewView.visibility = if (visible) View.INVISIBLE else View.VISIBLE
+            webRTCManager?.setVideoEnabled(!visible)
+            binding.btnVideoOff.alpha = if (visible) 0.4f else 1f
         }
         binding.btnNightMode.setOnClickListener { night?.toggleNightMode() }
         binding.btnEndStream.setOnClickListener {
-            AlertDialog.Builder(this)
-                .setTitle("End Stream?")
+            AlertDialog.Builder(this).setTitle("End Stream?")
                 .setPositiveButton("End") { _, _ -> finish() }
                 .setNegativeButton("Cancel", null).show()
         }
@@ -171,6 +204,8 @@ class CameraActivity : AppCompatActivity(),
     }
 
     private fun initWebRTC() {
+        // For WebRTC, we still need WebRTCManager for the peer connection
+        // but we use CameraX for local preview instead of WebRTC's own capturer
         webRTCManager = WebRTCManager(this, true, object : WebRTCManager.WebRTCListener {
             override fun onLocalIceCandidate(c: IceCandidate) {
                 signalingClient?.sendIceCandidate(c.sdp, c.sdpMid, c.sdpMLineIndex)
@@ -179,16 +214,17 @@ class CameraActivity : AppCompatActivity(),
                 runOnUiThread { isStreaming = true; updateStatus("🟢 Viewer Connected", true) }
             }
             override fun onConnectionFailed() {
-                runOnUiThread { updateStatus("Connection failed — check server", false) }
+                runOnUiThread { updateStatus("❌ Connection failed", false) }
             }
             override fun onRemoteVideoReceived() {}
         })
         webRTCManager?.initialize()
-        webRTCManager?.startLocalCamera(binding.localVideoView, isBackCamera)
+        // Use CameraX preview (already started in startCamera()) — don't start WebRTC camera
+        // The local video view (SurfaceViewRenderer) stays hidden
 
         signalingClient = SignalingClient(serverUrl, roomCode, true, object : SignalingClient.SignalingListener {
             override fun onConnected() { runOnUiThread { updateStatus("⏳ Waiting for viewer...", false) } }
-            override fun onDisconnected() { runOnUiThread { updateStatus("Disconnected from server", false) } }
+            override fun onDisconnected() { runOnUiThread { updateStatus("Disconnected", false) } }
             override fun onPeerJoined() {
                 webRTCManager?.createPeerConnection()
                 webRTCManager?.createOffer { sdp -> signalingClient?.sendOffer(sdp.description) }
@@ -206,8 +242,8 @@ class CameraActivity : AppCompatActivity(),
         wsStream = WebSocketStreamManager(serverUrl, roomCode, true, object : WebSocketStreamManager.StreamListener {
             override fun onConnected() { runOnUiThread { updateStatus("⏳ Waiting for viewer...", false) } }
             override fun onDisconnected() { runOnUiThread { updateStatus("Disconnected", false) } }
-            override fun onPeerJoined() { runOnUiThread { isStreaming = true; updateStatus("🟢 Viewer (Relay)", true) } }
-            override fun onPeerLeft() { runOnUiThread { isStreaming = false; updateStatus("Viewer left", false) } }
+            override fun onPeerJoined() { runOnUiThread { isStreaming = true; updateStatus("🟢 Viewer Connected", true) } }
+            override fun onPeerLeft() { runOnUiThread { isStreaming = false; updateStatus("⏳ Viewer disconnected", false) } }
             override fun onFrameReceived(d: ByteArray) {}
             override fun onStreamInfo(w: Int, h: Int) {}
             override fun onMotionEventReceived(t: Long) {}
@@ -217,48 +253,7 @@ class CameraActivity : AppCompatActivity(),
         wsStream?.connect()
     }
 
-    private fun startAnalysisCamera() {
-        val execLocal = exec ?: return
-        try {
-            val fut = ProcessCameraProvider.getInstance(this)
-            fut.addListener({
-                try {
-                    cameraProvider = fut.get()
-                    val analysis = ImageAnalysis.Builder()
-                        .setTargetResolution(Size(640, 480))
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build().also { ia ->
-                            ia.setAnalyzer(execLocal) { proxy ->
-                                try {
-                                    val bmp = proxy.toBitmap()
-                                    ai?.processFrame(bmp)
-                                    night?.analyzeFrameBrightness(bmp)
-                                    if (connectionType == ConnectionActivity.TYPE_WEBSOCKET && isStreaming)
-                                        wsStream?.sendFrame(bmp)
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Frame: ${e.message}")
-                                } finally {
-                                    proxy.close()
-                                }
-                            }
-                        }
-                    val sel = if (isBackCamera) CameraSelector.DEFAULT_BACK_CAMERA
-                    else CameraSelector.DEFAULT_FRONT_CAMERA
-                    cameraProvider?.unbindAll()
-                    val cam = cameraProvider?.bindToLifecycle(this, sel, analysis)
-                    cam?.let { night?.attachCamera(it) }
-                    Log.d(TAG, "Camera started OK")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Camera bind: ${e.message}")
-                    runOnUiThread { updateStatus("Camera: ${e.message?.take(60)}", false) }
-                }
-            }, ContextCompat.getMainExecutor(this))
-        } catch (e: Exception) {
-            Log.e(TAG, "Camera init: ${e.message}")
-        }
-    }
-
-    // AIProcessor callbacks
+    // AI callbacks
     override fun onMotionAlert(score: Float, regions: List<MotionDetector.MotionRegion>) {
         runOnUiThread {
             binding.tvMotionAlert.visibility = View.VISIBLE
@@ -306,16 +301,15 @@ class CameraActivity : AppCompatActivity(),
     override fun onRequestPermissionsResult(rc: Int, p: Array<String>, r: IntArray) {
         super.onRequestPermissionsResult(rc, p, r)
         if (rc == PermissionHelper.REQUEST_CODE) {
-            if (PermissionHelper.hasAllPermissions(this)) {
-                Handler(Looper.getMainLooper()).postDelayed({ init() }, 300)
-            } else {
-                Toast.makeText(this, "Camera & audio permissions required", Toast.LENGTH_LONG).show()
-            }
+            if (PermissionHelper.hasAllPermissions(this))
+                Handler(Looper.getMainLooper()).postDelayed({ init() }, 200)
+            else Toast.makeText(this, "Camera & audio permissions required", Toast.LENGTH_LONG).show()
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        try { cameraProvider?.unbindAll() } catch (e: Exception) {}
         try { ai?.release() } catch (e: Exception) {}
         try { night?.release() } catch (e: Exception) {}
         try { webRTCManager?.release() } catch (e: Exception) {}
