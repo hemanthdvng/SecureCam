@@ -29,7 +29,10 @@ import com.securecam.utils.PermissionHelper
 import com.securecam.webrtc.SignalingClient
 import com.securecam.webrtc.WebRTCManager
 import com.securecam.websocket.WebSocketStreamManager
+import org.webrtc.CapturerObserver
 import org.webrtc.IceCandidate
+import org.webrtc.NV21Buffer
+import org.webrtc.VideoFrame
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -48,6 +51,9 @@ class CameraActivity : AppCompatActivity(),
     private var wsStream: WebSocketStreamManager? = null
     private var ai: AIProcessor? = null
     private var night: NightModeHelper? = null
+
+    // CameraX → WebRTC bridge
+    private var webRtcCapturerObserver: CapturerObserver? = null
 
     private var isBackCamera = true
     private var isStreaming = false
@@ -85,23 +91,17 @@ class CameraActivity : AppCompatActivity(),
     private fun init() {
         updateStatus("Starting camera...", false)
 
-        // Start foreground service
         try {
             val si = Intent(this, CameraStreamingService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(si)
             else startService(si)
         } catch (e: Exception) { Log.e(TAG, "Service: ${e.message}") }
 
-        // Init AI
         try { ai = AIProcessor(this); ai?.initialize() } catch (e: Exception) { Log.e(TAG, "AI: ${e.message}") }
-
-        // Init night mode
         try { night = NightModeHelper(this) } catch (e: Exception) { Log.e(TAG, "Night: ${e.message}") }
 
-        // Start camera preview + analysis first (most important — shows video)
         startCamera()
 
-        // Connect to server after camera is up
         Handler(Looper.getMainLooper()).postDelayed({
             try {
                 if (connectionType == ConnectionActivity.TYPE_WEBRTC) initWebRTC()
@@ -120,12 +120,10 @@ class CameraActivity : AppCompatActivity(),
             try {
                 cameraProvider = fut.get()
 
-                // Preview use case — THIS is what shows the camera feed on screen
                 val preview = Preview.Builder().build().also {
                     it.setSurfaceProvider(binding.cameraPreviewView.surfaceProvider)
                 }
 
-                // Analysis use case — for AI processing
                 val analysis = ImageAnalysis.Builder()
                     .setTargetResolution(Size(640, 480))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -135,9 +133,23 @@ class CameraActivity : AppCompatActivity(),
                                 val bmp = proxy.toBitmap()
                                 ai?.processFrame(bmp)
                                 night?.analyzeFrameBrightness(bmp)
-                                // WebSocket relay — send frames to viewer
+
                                 if (connectionType == ConnectionActivity.TYPE_WEBSOCKET && isStreaming)
                                     wsStream?.sendFrame(bmp)
+
+                                // KEY FIX: feed raw YUV frames into the WebRTC VideoSource
+                                val observer = webRtcCapturerObserver
+                                if (connectionType == ConnectionActivity.TYPE_WEBRTC && observer != null) {
+                                    try {
+                                        val nv21 = imageProxyToNV21(proxy)
+                                        val buffer = NV21Buffer(nv21, proxy.width, proxy.height, null)
+                                        val frame = VideoFrame(buffer, proxy.imageInfo.rotationDegrees, System.nanoTime())
+                                        observer.onFrameCaptured(frame)
+                                        frame.release()
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "WebRTC frame feed: ${e.message}")
+                                    }
+                                }
                             } catch (e: Exception) {
                                 Log.e(TAG, "Frame: ${e.message}")
                             } finally {
@@ -150,12 +162,9 @@ class CameraActivity : AppCompatActivity(),
                 else CameraSelector.DEFAULT_FRONT_CAMERA
 
                 cameraProvider?.unbindAll()
-
-                // Bind BOTH preview and analysis to lifecycle
                 val cam = cameraProvider?.bindToLifecycle(this, selector, preview, analysis)
                 cam?.let {
                     night?.attachCamera(it)
-                    // Update torch button state
                     binding.btnTorch.setOnClickListener {
                         torchEnabled = !torchEnabled
                         cam.cameraControl.enableTorch(torchEnabled)
@@ -173,6 +182,44 @@ class CameraActivity : AppCompatActivity(),
         }, ContextCompat.getMainExecutor(this))
     }
 
+    /**
+     * Converts ImageProxy (YUV_420_888) to NV21 byte array for WebRTC.
+     */
+    private fun imageProxyToNV21(proxy: androidx.camera.core.ImageProxy): ByteArray {
+        val width  = proxy.width
+        val height = proxy.height
+        val yPlane = proxy.planes[0]
+        val uPlane = proxy.planes[1]
+        val vPlane = proxy.planes[2]
+
+        val yRowStride    = yPlane.rowStride
+        val uvRowStride   = uPlane.rowStride
+        val uvPixelStride = uPlane.pixelStride
+
+        val nv21 = ByteArray(width * height * 3 / 2)
+        val yBuf = yPlane.buffer
+        val uBuf = uPlane.buffer
+        val vBuf = vPlane.buffer
+
+        var offset = 0
+        for (row in 0 until height) {
+            yBuf.position(row * yRowStride)
+            yBuf.get(nv21, offset, width)
+            offset += width
+        }
+
+        val uvHeight = height / 2
+        val uvWidth  = width  / 2
+        for (row in 0 until uvHeight) {
+            for (col in 0 until uvWidth) {
+                val uvIndex = row * uvRowStride + col * uvPixelStride
+                vBuf.position(uvIndex); nv21[offset++] = vBuf.get()
+                uBuf.position(uvIndex); nv21[offset++] = uBuf.get()
+            }
+        }
+        return nv21
+    }
+
     private fun setupUI() {
         binding.tvRoomCode.text = "Room: $roomCode"
         binding.tvConnectionType.text = if (connectionType == ConnectionActivity.TYPE_WEBRTC) "WEBRTC" else "RELAY"
@@ -180,7 +227,7 @@ class CameraActivity : AppCompatActivity(),
 
         binding.btnSwitchCamera.setOnClickListener {
             isBackCamera = !isBackCamera
-            startCamera() // Restart with new camera
+            startCamera()
         }
         binding.btnMute.setOnClickListener {
             val muted = binding.btnMute.alpha < 0.7f
@@ -189,7 +236,6 @@ class CameraActivity : AppCompatActivity(),
         }
         binding.btnVideoOff.setOnClickListener {
             val visible = binding.btnVideoOff.alpha > 0.7f
-            // Toggle preview visibility
             binding.cameraPreviewView.visibility = if (visible) View.INVISIBLE else View.VISIBLE
             webRTCManager?.setVideoEnabled(!visible)
             binding.btnVideoOff.alpha = if (visible) 0.4f else 1f
@@ -204,8 +250,6 @@ class CameraActivity : AppCompatActivity(),
     }
 
     private fun initWebRTC() {
-        // For WebRTC, we still need WebRTCManager for the peer connection
-        // but we use CameraX for local preview instead of WebRTC's own capturer
         webRTCManager = WebRTCManager(this, true, object : WebRTCManager.WebRTCListener {
             override fun onLocalIceCandidate(c: IceCandidate) {
                 signalingClient?.sendIceCandidate(c.sdp, c.sdpMid, c.sdpMLineIndex)
@@ -218,14 +262,18 @@ class CameraActivity : AppCompatActivity(),
             }
             override fun onRemoteVideoReceived() {}
         })
+
         webRTCManager?.initialize()
-        // Use CameraX preview (already started in startCamera()) — don't start WebRTC camera
-        // The local video view (SurfaceViewRenderer) stays hidden
+
+        // KEY FIX: create VideoSource+VideoTrack BEFORE peer connection is made
+        webRtcCapturerObserver = webRTCManager?.createCameraXVideoSource()
+        Log.d(TAG, "CameraX→WebRTC bridge: observer=${webRtcCapturerObserver != null}")
 
         signalingClient = SignalingClient(serverUrl, roomCode, true, object : SignalingClient.SignalingListener {
             override fun onConnected() { runOnUiThread { updateStatus("⏳ Waiting for viewer...", false) } }
             override fun onDisconnected() { runOnUiThread { updateStatus("Disconnected", false) } }
             override fun onPeerJoined() {
+                // localVideoTrack is now non-null — peer connection will include it
                 webRTCManager?.createPeerConnection()
                 webRTCManager?.createOffer { sdp -> signalingClient?.sendOffer(sdp.description) }
             }
@@ -253,7 +301,6 @@ class CameraActivity : AppCompatActivity(),
         wsStream?.connect()
     }
 
-    // AI callbacks
     override fun onMotionAlert(score: Float, regions: List<MotionDetector.MotionRegion>) {
         runOnUiThread {
             binding.tvMotionAlert.visibility = View.VISIBLE
@@ -309,6 +356,7 @@ class CameraActivity : AppCompatActivity(),
 
     override fun onDestroy() {
         super.onDestroy()
+        webRtcCapturerObserver = null
         try { cameraProvider?.unbindAll() } catch (e: Exception) {}
         try { ai?.release() } catch (e: Exception) {}
         try { night?.release() } catch (e: Exception) {}
