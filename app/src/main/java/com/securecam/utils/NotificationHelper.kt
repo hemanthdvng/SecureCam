@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.securecam.R
 
 object NotificationHelper {
     private const val CH_MOTION   = "motion_alerts"
