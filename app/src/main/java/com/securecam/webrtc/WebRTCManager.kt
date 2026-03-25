@@ -17,6 +17,7 @@ class WebRTCManager(
     private var localAudioTrack: AudioTrack? = null
     private var videoCapturer: CameraVideoCapturer? = null
     private var localSurfaceTextureHelper: SurfaceTextureHelper? = null
+    private var videoSource: VideoSource? = null
 
     private val eglBase: EglBase = EglBase.create()
     val eglBaseContext: EglBase.Context get() = eglBase.eglBaseContext
@@ -50,6 +51,25 @@ class WebRTCManager(
         }
     }
 
+    /**
+     * Called on the camera side when using CameraX for capture.
+     * Creates a VideoSource + VideoTrack backed by a CapturerObserver.
+     * CameraActivity feeds ImageProxy frames into the returned observer.
+     */
+    fun createCameraXVideoSource(): CapturerObserver? {
+        return try {
+            videoSource = peerConnectionFactory.createVideoSource(false)
+            localVideoTrack = peerConnectionFactory.createVideoTrack("VIDEO_TRACK_0", videoSource)
+            val audioSource = peerConnectionFactory.createAudioSource(MediaConstraints())
+            localAudioTrack = peerConnectionFactory.createAudioTrack("AUDIO_TRACK_0", audioSource)
+            Log.d(TAG, "CameraX video source created — track ready for peer connection")
+            videoSource?.capturerObserver
+        } catch (e: Exception) {
+            Log.e(TAG, "createCameraXVideoSource: ${e.message}")
+            null
+        }
+    }
+
     // Only called in pure WebRTC mode (not used when CameraX is handling preview)
     fun startLocalCamera(sv: SurfaceViewRenderer, useBack: Boolean = false) {
         try {
@@ -64,8 +84,8 @@ class WebRTCManager(
             videoCapturer = enumerator.createCapturer(deviceName, null) ?: return
 
             localSurfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", eglBaseContext)
-            val videoSource = peerConnectionFactory.createVideoSource(false)
-            videoCapturer?.initialize(localSurfaceTextureHelper, context, videoSource.capturerObserver)
+            videoSource = peerConnectionFactory.createVideoSource(false)
+            videoCapturer?.initialize(localSurfaceTextureHelper, context, videoSource!!.capturerObserver)
             videoCapturer?.startCapture(1280, 720, 30)
 
             localVideoTrack = peerConnectionFactory.createVideoTrack("VIDEO_TRACK", videoSource)
@@ -134,19 +154,17 @@ class WebRTCManager(
                     }
                 })
 
-            // Only add tracks if they were created (pure WebRTC mode)
-            // In CameraX mode, tracks are null — that's fine, we skip them
             if (isCamera) {
                 val streamId = "securecam_stream"
                 localVideoTrack?.let {
                     peerConnection?.addTrack(it, listOf(streamId))
-                    Log.d(TAG, "Added video track")
-                } ?: Log.d(TAG, "No video track (CameraX mode — OK)")
+                    Log.d(TAG, "Added video track to peer connection")
+                } ?: Log.w(TAG, "localVideoTrack is null — call createCameraXVideoSource() before createPeerConnection()")
 
                 localAudioTrack?.let {
                     peerConnection?.addTrack(it, listOf(streamId))
-                    Log.d(TAG, "Added audio track")
-                } ?: Log.d(TAG, "No audio track (CameraX mode — OK)")
+                    Log.d(TAG, "Added audio track to peer connection")
+                } ?: Log.w(TAG, "localAudioTrack is null")
             }
 
         } catch (e: Exception) {
@@ -158,8 +176,8 @@ class WebRTCManager(
     fun createOffer(callback: (SessionDescription) -> Unit) {
         try {
             val constraints = MediaConstraints().apply {
-                mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
-                mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
+                mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"))
+                mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
             }
             peerConnection?.createOffer(object : SdpObserver {
                 override fun onCreateSuccess(sdp: SessionDescription) {
@@ -243,6 +261,7 @@ class WebRTCManager(
         try { videoCapturer?.dispose() } catch (e: Exception) {}
         try { localVideoTrack?.dispose() } catch (e: Exception) {}
         try { localAudioTrack?.dispose() } catch (e: Exception) {}
+        try { videoSource?.dispose() } catch (e: Exception) {}
         try { localSurfaceTextureHelper?.dispose() } catch (e: Exception) {}
         try { peerConnection?.close() } catch (e: Exception) {}
         try { peerConnection?.dispose() } catch (e: Exception) {}
