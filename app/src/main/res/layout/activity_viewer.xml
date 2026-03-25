@@ -11,14 +11,14 @@
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <!-- WebSocket Frame Relay View -->
+    <!-- WebSocket Relay View -->
     <ImageView
         android:id="@+id/wsFrameView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="fitCenter"
         android:visibility="gone"
-        android:contentDescription="Live stream frame" />
+        android:contentDescription="Live frame" />
 
     <!-- Waiting Screen -->
     <LinearLayout
@@ -27,27 +27,66 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="📡"
-            android:textSize="60sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Waiting for camera…"
-            android:textColor="@color/colorTextSecondary"
-            android:textSize="16sp" />
-
-        <ProgressBar
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:indeterminateTint="@color/colorAccent" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="📡" android:textSize="60sp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" android:text="Waiting for camera…"
+            android:textColor="@color/colorTextSecondary" android:textSize="16sp" />
+        <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:indeterminateTint="@color/colorAccent" />
     </LinearLayout>
+
+    <!-- Recording Indicator (top-right) -->
+    <TextView
+        android:id="@+id/tvRecordingIndicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="56dp"
+        android:layout_marginEnd="12dp"
+        android:text="🔴 REC"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:background="#CCff0000"
+        android:padding="4dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:visibility="gone" />
+
+    <!-- Night mode label (top-left) -->
+    <TextView
+        android:id="@+id/tvNightModeLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginTop="56dp"
+        android:layout_marginStart="12dp"
+        android:text="🌙 Night"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:background="#BB6E40C9"
+        android:padding="4dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:visibility="gone" />
+
+    <!-- PTT speaking label -->
+    <TextView
+        android:id="@+id/tvPttLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="56dp"
+        android:text="🔴 Speaking"
+        android:textColor="@color/white"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:background="#CCff3b3b"
+        android:padding="6dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:visibility="gone" />
 
     <!-- Controls Overlay -->
     <LinearLayout
@@ -105,12 +144,9 @@
         </LinearLayout>
 
         <!-- Spacer -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+        <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
 
-        <!-- AI Alerts (bottom-left stack) -->
+        <!-- AI Alerts area -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -121,7 +157,7 @@
                 android:id="@+id/tvMotionAlert"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="⚠️ Motion Detected!"
+                android:text="⚠️ Motion!"
                 android:textColor="@color/white"
                 android:textSize="14sp"
                 android:textStyle="bold"
@@ -136,7 +172,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="🤖 Object detected"
+                android:text="🤖"
                 android:textColor="@color/white"
                 android:textSize="13sp"
                 android:background="#BB00FF88"
@@ -156,30 +192,116 @@
                 android:visibility="gone" />
         </LinearLayout>
 
+        <!-- Zoom bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔍"
+                android:textSize="16sp"
+                android:layout_marginEnd="8dp" />
+
+            <SeekBar
+                android:id="@+id/seekZoom"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:progressTint="@color/colorAccent"
+                android:thumbTint="@color/white" />
+
+            <TextView
+                android:id="@+id/tvZoomLabel"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="1.0×"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                android:gravity="end" />
+        </LinearLayout>
+
         <!-- Bottom Controls -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="70dp"
+            android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center"
             android:background="@color/overlay_dark"
-            android:padding="12dp">
+            android:padding="10dp">
 
+            <!-- Switch Camera -->
+            <ImageButton
+                android:id="@+id/btnSwitchCamera"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:src="@android:drawable/ic_menu_rotate"
+                android:tint="@color/white"
+                android:background="@color/colorCard"
+                android:contentDescription="Switch Camera" />
+
+            <!-- Night Mode -->
+            <ImageButton
+                android:id="@+id/btnNightMode"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:alpha="0.5"
+                android:src="@android:drawable/ic_menu_today"
+                android:tint="#AA88FF"
+                android:background="@color/colorCard"
+                android:contentDescription="Night Mode" />
+
+            <!-- Torch -->
+            <ImageButton
+                android:id="@+id/btnTorch"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:alpha="0.5"
+                android:src="@android:drawable/star_big_on"
+                android:tint="#FFAA00"
+                android:background="@color/colorCard"
+                android:contentDescription="Torch" />
+
+            <!-- PTT (Push to Talk) -->
+            <Button
+                android:id="@+id/btnPtt"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:alpha="0.55"
+                android:text="🎤 PTT"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                android:backgroundTint="#FF005500"
+                style="@style/Widget.MaterialComponents.Button" />
+
+            <!-- Fullscreen -->
             <ImageButton
                 android:id="@+id/btnFullscreen"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="16dp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
                 android:src="@android:drawable/ic_menu_zoom"
                 android:tint="@color/white"
                 android:background="@color/colorCard"
                 android:contentDescription="Fullscreen" />
 
+            <!-- Disconnect -->
             <Button
                 android:id="@+id/btnDisconnect"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="DISCONNECT"
+                android:text="END"
                 android:textColor="@color/white"
                 android:backgroundTint="@color/colorAccentRed"
                 style="@style/Widget.MaterialComponents.Button" />
