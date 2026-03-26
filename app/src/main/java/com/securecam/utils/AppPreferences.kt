@@ -3,6 +3,7 @@ package com.securecam.utils
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Environment
+import java.io.File
 
 object AppPreferences {
     private lateinit var prefs: SharedPreferences
@@ -43,6 +44,10 @@ object AppPreferences {
         get() = prefs.getBoolean("flash_on_motion", false)
         set(value) = prefs.edit().putBoolean("flash_on_motion", value).apply()
 
+    var intruderModeEnabled: Boolean
+        get() = prefs.getBoolean("intruder_mode", true)
+        set(value) = prefs.edit().putBoolean("intruder_mode", value).apply()
+
     var motionSensitivity: Int
         get() = prefs.getInt("motion_sensitivity", 40)
         set(value) = prefs.edit().putInt("motion_sensitivity", value).apply()
@@ -63,12 +68,10 @@ object AppPreferences {
         get() = prefs.getBoolean("use_back_camera", true)
         set(value) = prefs.edit().putBoolean("use_back_camera", value).apply()
 
-    // Auto-recording
     var autoRecordOnMotion: Boolean
         get() = prefs.getBoolean("auto_record_motion", false)
         set(value) = prefs.edit().putBoolean("auto_record_motion", value).apply()
 
-    // Recording save location: 0=Movies/SecureCam, 1=DCIM/SecureCam, 2=Custom
     var recordingSaveLocation: Int
         get() = prefs.getInt("recording_location", 0)
         set(value) = prefs.edit().putInt("recording_location", value).apply()
@@ -77,12 +80,16 @@ object AppPreferences {
         get() = prefs.getString("recording_custom_path", "") ?: ""
         set(value) = prefs.edit().putString("recording_custom_path", value).apply()
 
-    fun getRecordingDirectory(): java.io.File {
+    var eventRetentionDays: Int
+        get() = prefs.getInt("event_retention_days", 7)
+        set(value) = prefs.edit().putInt("event_retention_days", value).apply()
+
+    fun getRecordingDirectory(): File {
         return when (recordingSaveLocation) {
-            1 -> java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "SecureCam")
-            2 -> if (recordingCustomPath.isNotEmpty()) java.io.File(recordingCustomPath) else
-                 java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "SecureCam")
-            else -> java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "SecureCam")
+            1    -> File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "SecureCam")
+            2    -> if (recordingCustomPath.isNotEmpty()) File(recordingCustomPath)
+                    else File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "SecureCam")
+            else -> File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "SecureCam")
         }
     }
 }
