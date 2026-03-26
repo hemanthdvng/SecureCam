@@ -10,8 +10,8 @@ android {
         applicationId "com.securecam"
         minSdk 24
         targetSdk 34
-        versionCode 3
-        versionName "3.0.0"
+        versionCode 4
+        versionName "4.0.0"
         multiDexEnabled true
 
         kapt {
@@ -22,7 +22,7 @@ android {
     }
 
     buildTypes {
-        debug { debuggable true; minifyEnabled false }
+        debug   { debuggable true; minifyEnabled false }
         release { minifyEnabled false }
     }
 
@@ -30,13 +30,9 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-
     kotlinOptions { jvmTarget = '17' }
 
-    buildFeatures {
-        viewBinding true
-        buildConfig true
-    }
+    buildFeatures { viewBinding true; buildConfig true }
 
     packagingOptions {
         resources {
@@ -46,10 +42,7 @@ android {
 
     aaptOptions { noCompress "tflite" }
 
-    lint {
-        abortOnError false
-        checkReleaseBuilds false
-    }
+    lint { abortOnError false; checkReleaseBuilds false }
 }
 
 dependencies {
@@ -83,8 +76,11 @@ dependencies {
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'
     implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
     implementation 'org.tensorflow:tensorflow-lite-task-vision:0.4.4'
-    // Room — face embedding storage
+    // Room — face embedding + event storage
     implementation 'androidx.room:room-runtime:2.6.1'
     implementation 'androidx.room:room-ktx:2.6.1'
     kapt 'androidx.room:room-compiler:2.6.1'
+    // QR code generation + scanning
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
 }
