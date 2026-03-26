@@ -1,158 +1,209 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/colorPrimary"
-    android:gravity="center"
-    android:padding="28dp">
+    android:background="@color/colorPrimary">
 
-    <!-- Header -->
-    <ImageView
-        android:layout_width="72dp"
-        android:layout_height="72dp"
-        android:src="@android:drawable/ic_menu_camera"
-        android:tint="@color/colorAccent"
-        android:contentDescription="Logo" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="SecureCam"
-        android:textColor="@color/colorTextPrimary"
-        android:textSize="30sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="Choose your role to start"
-        android:textColor="@color/colorTextSecondary"
-        android:textSize="14sp" />
-
-    <!-- Camera Card -->
-    <androidx.cardview.widget.CardView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        app:cardBackgroundColor="@color/colorCard"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="6dp">
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="24dp">
 
-        <LinearLayout
-            android:id="@+id/btnCamera"
+        <ImageView
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_marginTop="12dp"
+            android:src="@android:drawable/ic_menu_camera"
+            android:tint="@color/colorAccent"
+            android:contentDescription="Logo" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="SecureCam"
+            android:textColor="@color/colorTextPrimary"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="WatchTower AI • Choose your role"
+            android:textColor="@color/colorTextSecondary"
+            android:textSize="13sp" />
+
+        <!-- Camera Card -->
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="24dp"
-            android:gravity="center"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground">
-
-            <TextView
-                android:layout_width="wrap_content"
+            android:layout_marginTop="32dp"
+            app:cardBackgroundColor="@color/colorCard"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="6dp">
+            <LinearLayout
+                android:id="@+id/btnCamera"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="📷"
-                android:textSize="44sp" />
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="📷" android:textSize="40sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp" android:text="Camera Mode"
+                    android:textColor="@color/colorTextPrimary" android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp" android:text="Stream live video with AI detection"
+                    android:textColor="@color/colorTextSecondary" android:textSize="12sp" android:gravity="center" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Camera Mode"
-                android:textColor="@color/colorTextPrimary"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="This phone streams live video with AI detection"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="13sp"
-                android:gravity="center" />
-        </LinearLayout>
-    </androidx.cardview.widget.CardView>
-
-    <!-- Viewer Card -->
-    <androidx.cardview.widget.CardView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        app:cardBackgroundColor="@color/colorCard"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="6dp">
-
-        <LinearLayout
-            android:id="@+id/btnViewer"
+        <!-- Viewer Card -->
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="24dp"
-            android:gravity="center"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground">
-
-            <TextView
-                android:layout_width="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="@color/colorCard"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="6dp">
+            <LinearLayout
+                android:id="@+id/btnViewer"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="👁"
-                android:textSize="44sp" />
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="👁" android:textSize="40sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp" android:text="Viewer Mode"
+                    android:textColor="@color/colorTextPrimary" android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp" android:text="Watch remote camera live"
+                    android:textColor="@color/colorTextSecondary" android:textSize="12sp" android:gravity="center" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Viewer Mode"
-                android:textColor="@color/colorTextPrimary"
-                android:textSize="20sp"
-                android:textStyle="bold" />
+        <!-- Secondary actions row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- Face Management -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Watch the remote camera live on this phone"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="13sp"
-                android:gravity="center" />
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cardBackgroundColor="@color/colorCard"
+                app:cardCornerRadius="12dp">
+                <LinearLayout
+                    android:id="@+id/btnFaceManagement"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="👤" android:textSize="28sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" android:text="Faces"
+                        android:textColor="@color/colorTextPrimary" android:textSize="13sp" android:textStyle="bold" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Enroll people"
+                        android:textColor="@color/colorTextSecondary" android:textSize="11sp" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Timeline -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:cardBackgroundColor="@color/colorCard"
+                app:cardCornerRadius="12dp">
+                <LinearLayout
+                    android:id="@+id/btnTimeline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="📅" android:textSize="28sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" android:text="Timeline"
+                        android:textColor="@color/colorTextPrimary" android:textSize="13sp" android:textStyle="bold" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Event history"
+                        android:textColor="@color/colorTextSecondary" android:textSize="11sp" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
 
-    <!-- Last room -->
-    <TextView
-        android:id="@+id/tvLastRoom"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:textColor="@color/colorAccent"
-        android:textSize="13sp"
-        android:visibility="gone"
-        android:text="Last room: ——" />
+        <!-- Last room + QR row -->
+        <TextView
+            android:id="@+id/tvLastRoom"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textColor="@color/colorAccent"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:text="Last room: ——" />
 
-    <!-- Settings Button -->
-    <Button
-        android:id="@+id/btnSettings"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="⚙️ Settings"
-        android:textColor="@color/colorTextSecondary"
-        style="@style/Widget.MaterialComponents.Button.TextButton" />
+        <!-- Settings + QR row -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp">
 
-    <!-- Version -->
-    <TextView
-        android:id="@+id/versionText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:textColor="@color/colorTextHint"
-        android:textSize="11sp" />
+            <Button
+                android:id="@+id/btnSettings"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="⚙️ Settings"
+                android:textColor="@color/colorTextSecondary"
+                style="@style/Widget.MaterialComponents.Button.TextButton" />
 
-</LinearLayout>
+            <Button
+                android:id="@+id/btnQRPair"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔗 QR Pair"
+                android:textColor="@color/colorTextSecondary"
+                style="@style/Widget.MaterialComponents.Button.TextButton" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/versionText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="@color/colorTextHint"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+</ScrollView>
