@@ -42,14 +42,12 @@
         android:padding="12dp"
         android:background="@color/overlay_dark"
         android:gravity="center_vertical">
-
         <View
             android:id="@+id/statusDot"
             android:layout_width="10dp"
             android:layout_height="10dp"
             android:background="@android:drawable/presence_busy"
             android:layout_marginEnd="8dp"/>
-
         <TextView
             android:id="@+id/tvStatus"
             android:layout_width="0dp"
@@ -58,7 +56,6 @@
             android:text="Initializing..."
             android:textColor="@color/colorTextPrimary"
             android:textSize="13sp"/>
-
         <TextView
             android:id="@+id/tvConnectionType"
             android:layout_width="wrap_content"
@@ -71,7 +68,6 @@
             android:padding="4dp"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"/>
-
         <TextView
             android:id="@+id/tvRoomCode"
             android:layout_width="wrap_content"
@@ -82,13 +78,29 @@
             android:textSize="12sp"/>
     </LinearLayout>
 
+    <!-- Intruder Mode Alert Banner -->
+    <TextView
+        android:id="@+id/tvIntruderAlert"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="48dp"
+        android:text="🚨 INTRUDER DETECTED — TAP TO DISMISS"
+        android:textColor="@color/white"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:background="#DDFF0000"
+        android:padding="12dp"
+        android:visibility="gone"/>
+
     <!-- Motion Alert -->
     <TextView
         android:id="@+id/tvMotionAlert"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="60dp"
+        android:layout_marginTop="104dp"
         android:text="⚠️ Motion Detected!"
         android:textColor="@color/white"
         android:textSize="16sp"
@@ -107,7 +119,6 @@
         android:layout_marginTop="56dp"
         android:layout_marginStart="12dp"
         android:orientation="vertical">
-
         <TextView
             android:id="@+id/tvObjectLabel"
             android:layout_width="wrap_content"
@@ -119,7 +130,6 @@
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
             android:visibility="gone"/>
-
         <TextView
             android:id="@+id/tvFaceLabel"
             android:layout_width="wrap_content"
@@ -132,7 +142,6 @@
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
             android:visibility="gone"/>
-
         <TextView
             android:id="@+id/tvNightMode"
             android:layout_width="wrap_content"
@@ -163,12 +172,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:layout_marginBottom="90dp"
+        android:layout_marginBottom="88dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="12dp"
         android:paddingEnd="12dp">
-
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -176,7 +184,6 @@
             android:textColor="@color/colorTextSecondary"
             android:textSize="11sp"
             android:layout_marginEnd="8dp"/>
-
         <ProgressBar
             android:id="@+id/motionBar"
             style="@style/Widget.AppCompat.ProgressBar.Horizontal"
@@ -189,85 +196,102 @@
     </LinearLayout>
 
     <!-- Bottom Controls -->
-    <LinearLayout
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="80dp"
         android:layout_gravity="bottom"
-        android:orientation="horizontal"
-        android:gravity="center"
         android:background="@color/overlay_dark"
-        android:padding="12dp">
-
-        <ImageButton
-            android:id="@+id/btnSwitchCamera"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="10dp"
-            android:src="@android:drawable/ic_menu_rotate"
-            android:tint="@color/white"
-            android:background="@color/colorCard"
-            android:contentDescription="Switch Camera"/>
-
-        <ImageButton
-            android:id="@+id/btnMute"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="10dp"
-            android:src="@android:drawable/ic_lock_silent_mode_off"
-            android:tint="@color/white"
-            android:background="@color/colorCard"
-            android:contentDescription="Mute"/>
-
-        <ImageButton
-            android:id="@+id/btnVideoOff"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="10dp"
-            android:src="@android:drawable/ic_menu_camera"
-            android:tint="@color/white"
-            android:background="@color/colorCard"
-            android:contentDescription="Video Off"/>
-
-        <ImageButton
-            android:id="@+id/btnTorch"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="10dp"
-            android:alpha="0.5"
-            android:src="@android:drawable/star_big_on"
-            android:tint="@color/colorAccentOrange"
-            android:background="@color/colorCard"
-            android:contentDescription="Torch"/>
-
-        <ImageButton
-            android:id="@+id/btnNightMode"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="10dp"
-            android:alpha="0.5"
-            android:src="@android:drawable/ic_menu_today"
-            android:tint="@color/night_color"
-            android:background="@color/colorCard"
-            android:contentDescription="Night Mode"/>
-
-        <Button
-            android:id="@+id/btnEndStream"
+        android:scrollbars="none">
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="END"
-            android:textColor="@color/white"
-            android:backgroundTint="@color/colorAccentRed"
-            style="@style/Widget.MaterialComponents.Button"/>
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="10dp">
 
-        <ImageButton
-            android:id="@+id/btnViewRecordings"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="8dp"
-            android:src="@android:drawable/ic_menu_gallery"
-            android:tint="@color/colorAccentGreen"
-            android:background="@color/colorCard"
-            android:contentDescription="View Recordings"/>
-    </LinearLayout>
+            <ImageButton
+                android:id="@+id/btnSwitchCamera"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:src="@android:drawable/ic_menu_rotate"
+                android:tint="@color/white"
+                android:background="@color/colorCard"
+                android:contentDescription="Switch Camera"/>
+            <ImageButton
+                android:id="@+id/btnMute"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:src="@android:drawable/ic_lock_silent_mode_off"
+                android:tint="@color/white"
+                android:background="@color/colorCard"
+                android:contentDescription="Mute"/>
+            <ImageButton
+                android:id="@+id/btnVideoOff"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:src="@android:drawable/ic_menu_camera"
+                android:tint="@color/white"
+                android:background="@color/colorCard"
+                android:contentDescription="Video Off"/>
+            <ImageButton
+                android:id="@+id/btnTorch"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:alpha="0.5"
+                android:src="@android:drawable/star_big_on"
+                android:tint="@color/colorAccentOrange"
+                android:background="@color/colorCard"
+                android:contentDescription="Torch"/>
+            <ImageButton
+                android:id="@+id/btnNightMode"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:alpha="0.5"
+                android:src="@android:drawable/ic_menu_today"
+                android:tint="@color/night_color"
+                android:background="@color/colorCard"
+                android:contentDescription="Night Mode"/>
+            <ImageButton
+                android:id="@+id/btnFaceManage"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:src="@android:drawable/ic_menu_myplaces"
+                android:tint="@color/colorAccent"
+                android:background="@color/colorCard"
+                android:contentDescription="Face Management"/>
+            <ImageButton
+                android:id="@+id/btnTimeline"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:src="@android:drawable/ic_menu_agenda"
+                android:tint="@color/colorAccentGreen"
+                android:background="@color/colorCard"
+                android:contentDescription="Timeline"/>
+            <Button
+                android:id="@+id/btnEndStream"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="END"
+                android:textColor="@color/white"
+                android:backgroundTint="@color/colorAccentRed"
+                style="@style/Widget.MaterialComponents.Button"/>
+            <ImageButton
+                android:id="@+id/btnViewRecordings"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@android:drawable/ic_menu_gallery"
+                android:tint="@color/colorAccentGreen"
+                android:background="@color/colorCard"
+                android:contentDescription="View Recordings"/>
+        </LinearLayout>
+    </HorizontalScrollView>
 
 </FrameLayout>
