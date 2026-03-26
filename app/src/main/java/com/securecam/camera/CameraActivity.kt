@@ -3,7 +3,6 @@ package com.securecam.camera
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -18,13 +17,19 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.securecam.ai.AIProcessor
+import com.securecam.ai.EventDatabase
+import com.securecam.ai.EventRecord
 import com.securecam.ai.FaceDetectionManager
+import com.securecam.ai.IntruderModeManager
 import com.securecam.ai.MotionDetector
 import com.securecam.ai.ObjectDetectionManager
 import com.securecam.databinding.ActivityCameraBinding
 import com.securecam.ui.ConnectionActivity
+import com.securecam.ui.FaceManagementActivity
 import com.securecam.ui.RecordingsActivity
+import com.securecam.ui.TimelineActivity
 import com.securecam.utils.AppPreferences
 import com.securecam.utils.NightModeHelper
 import com.securecam.utils.NotificationHelper
@@ -33,6 +38,9 @@ import com.securecam.webrtc.CommandChannel
 import com.securecam.webrtc.SignalingClient
 import com.securecam.webrtc.WebRTCManager
 import com.securecam.websocket.WebSocketStreamManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.webrtc.CapturerObserver
 import org.webrtc.IceCandidate
@@ -59,6 +67,8 @@ class CameraActivity : AppCompatActivity(),
     private var ai: AIProcessor? = null
     private var night: NightModeHelper? = null
     private var recorder: RecordingManager? = null
+    private var intruderMode: IntruderModeManager? = null
+    private var eventDb: EventDatabase? = null
 
     private var webRtcCapturerObserver: CapturerObserver? = null
     private var isBackCamera = true
@@ -79,10 +89,10 @@ class CameraActivity : AppCompatActivity(),
             Log.e(TAG, "Binding: ${e.message}"); finish(); return
         }
 
-        roomCode      = intent.getStringExtra(ConnectionActivity.EXTRA_ROOM_CODE) ?: ""
+        roomCode       = intent.getStringExtra(ConnectionActivity.EXTRA_ROOM_CODE) ?: ""
         connectionType = intent.getStringExtra(ConnectionActivity.EXTRA_CONNECTION_TYPE) ?: ConnectionActivity.TYPE_WEBRTC
-        serverUrl     = intent.getStringExtra(ConnectionActivity.EXTRA_SERVER_URL) ?: ""
-        isBackCamera  = AppPreferences.useBackCamera
+        serverUrl      = intent.getStringExtra(ConnectionActivity.EXTRA_SERVER_URL) ?: ""
+        isBackCamera   = AppPreferences.useBackCamera
 
         exec = Executors.newSingleThreadExecutor()
         setupUI()
@@ -101,8 +111,13 @@ class CameraActivity : AppCompatActivity(),
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(si) else startService(si)
         } catch (e: Exception) { Log.e(TAG, "Service: ${e.message}") }
 
-        try { ai = AIProcessor(this, this).also { it.initialize() } } catch (e: Exception) { Log.e(TAG, "AI: ${e.message}") }
-        try { night = NightModeHelper(this) } catch (e: Exception) { Log.e(TAG, "Night: ${e.message}") }
+        eventDb = EventDatabase.getInstance(this)
+        intruderMode = IntruderModeManager(this) { enabled ->
+            try { boundCamera?.cameraControl?.enableTorch(enabled) } catch (_: Exception) {}
+        }
+
+        try { ai       = AIProcessor(this, this).also { it.initialize() } } catch (e: Exception) { Log.e(TAG, "AI: ${e.message}") }
+        try { night    = NightModeHelper(this) } catch (e: Exception) { Log.e(TAG, "Night: ${e.message}") }
         try { recorder = RecordingManager(this, this) } catch (e: Exception) { Log.e(TAG, "Recorder: ${e.message}") }
 
         startCamera()
@@ -136,12 +151,13 @@ class CameraActivity : AppCompatActivity(),
                                     val bmp = proxy.toBitmap()
                                     ai?.processFrame(bmp)
                                     night?.analyzeFrameBrightness(bmp)
-                                    if (connectionType == ConnectionActivity.TYPE_WEBSOCKET && isStreaming) wsStream?.sendFrame(bmp)
+                                    if (connectionType == ConnectionActivity.TYPE_WEBSOCKET && isStreaming)
+                                        wsStream?.sendFrame(bmp)
                                     val obs = webRtcCapturerObserver
                                     if (connectionType == ConnectionActivity.TYPE_WEBRTC && obs != null) {
                                         try {
-                                            val nv21 = imageProxyToNV21(proxy)
-                                            val buf = NV21Buffer(nv21, proxy.width, proxy.height, null)
+                                            val nv21  = imageProxyToNV21(proxy)
+                                            val buf   = NV21Buffer(nv21, proxy.width, proxy.height, null)
                                             val frame = VideoFrame(buf, proxy.imageInfo.rotationDegrees, System.nanoTime())
                                             obs.onFrameCaptured(frame); frame.release()
                                         } catch (e: Exception) { Log.e(TAG, "WebRTC frame: ${e.message}") }
@@ -151,22 +167,18 @@ class CameraActivity : AppCompatActivity(),
                             }
                         }
 
-                    // Build VideoCapture for recording
                     val videoCapture = recorder?.buildVideoCapture()
-
                     val selector = if (isBackCamera) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
                     cameraProvider?.unbindAll()
 
-                    val cam = if (videoCapture != null) {
+                    val cam = if (videoCapture != null)
                         cameraProvider?.bindToLifecycle(this, selector, preview, analysis, videoCapture)
-                    } else {
+                    else
                         cameraProvider?.bindToLifecycle(this, selector, preview, analysis)
-                    }
 
                     boundCamera = cam
                     cam?.let {
                         night?.attachCamera(it)
-                        // Apply current zoom
                         it.cameraControl.setZoomRatio(currentZoom)
                         binding.btnTorch.setOnClickListener { _ ->
                             torchEnabled = !torchEnabled
@@ -175,7 +187,6 @@ class CameraActivity : AppCompatActivity(),
                             sendCameraEvent(CommandChannel.evtTorchState(torchEnabled))
                         }
                     }
-
                     updateStatus("📷 Ready — waiting for viewer...", false)
                 } catch (e: Exception) {
                     Log.e(TAG, "Camera bind: ${e.message}")
@@ -192,18 +203,16 @@ class CameraActivity : AppCompatActivity(),
         val yBuf = yP.buffer; val uBuf = uP.buffer; val vBuf = vP.buffer
         var offset = 0
         for (row in 0 until h) { yBuf.position(row * yP.rowStride); yBuf.get(nv21, offset, w); offset += w }
-        for (row in 0 until h / 2) {
-            for (col in 0 until w / 2) {
-                val idx = row * uP.rowStride + col * uP.pixelStride
-                vBuf.position(idx); nv21[offset++] = vBuf.get()
-                uBuf.position(idx); nv21[offset++] = uBuf.get()
-            }
+        for (row in 0 until h / 2) for (col in 0 until w / 2) {
+            val idx = row * uP.rowStride + col * uP.pixelStride
+            vBuf.position(idx); nv21[offset++] = vBuf.get()
+            uBuf.position(idx); nv21[offset++] = uBuf.get()
         }
         return nv21
     }
 
     private fun setupUI() {
-        binding.tvRoomCode.text = "Room: $roomCode"
+        binding.tvRoomCode.text       = "Room: $roomCode"
         binding.tvConnectionType.text = if (connectionType == ConnectionActivity.TYPE_WEBRTC) "WEBRTC" else "RELAY"
         updateStatus("Initializing...", false)
 
@@ -236,10 +245,20 @@ class CameraActivity : AppCompatActivity(),
         binding.btnViewRecordings.setOnClickListener {
             startActivity(Intent(this, RecordingsActivity::class.java))
         }
+        binding.btnFaceManage.setOnClickListener {
+            startActivity(Intent(this, FaceManagementActivity::class.java))
+        }
+        binding.btnTimeline.setOnClickListener {
+            startActivity(Intent(this, TimelineActivity::class.java))
+        }
+        // Dismiss intruder mode on tap of the intruder banner
+        binding.tvIntruderAlert.setOnClickListener {
+            intruderMode?.deactivate()
+            binding.tvIntruderAlert.visibility = View.GONE
+        }
         binding.motionBar.max = 100
     }
 
-    /** Handle DataChannel commands from viewer */
     private fun handleViewerCommand(json: String) {
         try {
             val obj = JSONObject(json)
@@ -248,7 +267,6 @@ class CameraActivity : AppCompatActivity(),
                     val ratio = obj.optDouble("value", 1.0).toFloat()
                     currentZoom = ratio
                     boundCamera?.cameraControl?.setZoomRatio(ratio)
-                    Log.d(TAG, "Zoom set to $ratio")
                 }
                 CommandChannel.CMD_NIGHT_MODE -> {
                     val on = obj.optBoolean("on", false)
@@ -270,9 +288,7 @@ class CameraActivity : AppCompatActivity(),
         } catch (e: Exception) { Log.e(TAG, "handleViewerCommand: ${e.message}") }
     }
 
-    private fun sendCameraEvent(json: String) {
-        webRTCManager?.sendCommand(json)
-    }
+    private fun sendCameraEvent(json: String) { webRTCManager?.sendCommand(json) }
 
     private fun initWebRTC() {
         webRTCManager = WebRTCManager(this, true, object : WebRTCManager.WebRTCListener {
@@ -294,13 +310,13 @@ class CameraActivity : AppCompatActivity(),
         webRtcCapturerObserver = webRTCManager?.createCameraXVideoSource()
 
         signalingClient = SignalingClient(serverUrl, roomCode, true, object : SignalingClient.SignalingListener {
-            override fun onConnected() { runOnUiThread { updateStatus("⏳ Waiting for viewer...", false) } }
+            override fun onConnected()    { runOnUiThread { updateStatus("⏳ Waiting for viewer...", false) } }
             override fun onDisconnected() { runOnUiThread { updateStatus("Disconnected", false) } }
             override fun onPeerJoined() {
                 webRTCManager?.createPeerConnection()
                 webRTCManager?.createOffer { sdp -> signalingClient?.sendOffer(sdp.description) }
             }
-            override fun onPeerLeft() { runOnUiThread { isStreaming = false; updateStatus("⏳ Viewer disconnected", false) } }
+            override fun onPeerLeft()  { runOnUiThread { isStreaming = false; updateStatus("⏳ Viewer disconnected", false) } }
             override fun onOfferReceived(sdp: String) {}
             override fun onAnswerReceived(sdp: String) { webRTCManager?.setRemoteAnswer(sdp) }
             override fun onIceCandidateReceived(c: String, m: String, i: Int) { webRTCManager?.addIceCandidate(c, m, i) }
@@ -311,10 +327,10 @@ class CameraActivity : AppCompatActivity(),
 
     private fun initWS() {
         wsStream = WebSocketStreamManager(serverUrl, roomCode, true, object : WebSocketStreamManager.StreamListener {
-            override fun onConnected() { runOnUiThread { updateStatus("⏳ Waiting for viewer...", false) } }
+            override fun onConnected()  { runOnUiThread { updateStatus("⏳ Waiting for viewer...", false) } }
             override fun onDisconnected() { runOnUiThread { updateStatus("Disconnected", false) } }
             override fun onPeerJoined() { runOnUiThread { isStreaming = true; updateStatus("🟢 Viewer Connected", true) } }
-            override fun onPeerLeft() { runOnUiThread { isStreaming = false; updateStatus("⏳ Viewer disconnected", false) } }
+            override fun onPeerLeft()   { runOnUiThread { isStreaming = false; updateStatus("⏳ Viewer disconnected", false) } }
             override fun onFrameReceived(d: ByteArray) {}
             override fun onStreamInfo(w: Int, h: Int) {}
             override fun onMotionEventReceived(t: Long) {}
@@ -324,72 +340,99 @@ class CameraActivity : AppCompatActivity(),
         wsStream?.connect()
     }
 
-    // AI callbacks
+    // ── AI callbacks ─────────────────────────────────────────────────────────
+
     override fun onMotionAlert(score: Float, regions: List<MotionDetector.MotionRegion>) {
         runOnUiThread {
             binding.tvMotionAlert.visibility = View.VISIBLE
             binding.tvMotionAlert.postDelayed({ binding.tvMotionAlert.visibility = View.GONE }, 3000)
         }
-        try { NotificationHelper.showMotionAlert(this, score) } catch (e: Exception) {}
+        try { NotificationHelper.showMotionAlert(this, score) } catch (_: Exception) {}
         wsStream?.sendMotionEvent()
         sendCameraEvent(CommandChannel.evtMotion(score))
         recorder?.onMotionScore(score, AppPreferences.getRecordingDirectory(), AppPreferences.autoRecordOnMotion)
+        logEvent("motion", "", score, if (score > 0.5f) "warning" else "normal")
     }
+
     override fun onMotionScoreUpdate(score: Float) {
         runOnUiThread { binding.motionBar.progress = (score * 100).toInt() }
     }
+
     override fun onObjectsUpdate(objects: List<ObjectDetectionManager.DetectedObject>) {
         runOnUiThread {
             if (objects.isEmpty()) binding.tvObjectLabel.visibility = View.GONE
-            else { binding.tvObjectLabel.text = objects.joinToString { it.topLabel.text }; binding.tvObjectLabel.visibility = View.VISIBLE }
+            else {
+                binding.tvObjectLabel.text = objects.joinToString { it.topLabel.text }
+                binding.tvObjectLabel.visibility = View.VISIBLE
+            }
         }
     }
+
     override fun onObjectAlert(label: String, confidence: Float) {
-        try { NotificationHelper.showObjectDetectionAlert(this, label, confidence) } catch (e: Exception) {}
+        try { NotificationHelper.showObjectDetectionAlert(this, label, confidence) } catch (_: Exception) {}
         wsStream?.sendAiEvent(label, confidence)
         sendCameraEvent(CommandChannel.evtObject(label, confidence))
+        val priority = if (label.lowercase().contains("person")) "warning" else "normal"
+        logEvent("object", label, confidence, priority)
     }
+
     override fun onFacesUpdate(faces: List<FaceDetectionManager.DetectedFace>) {
         runOnUiThread {
             if (faces.isEmpty()) binding.tvFaceLabel.visibility = View.GONE
             else { binding.tvFaceLabel.text = "👤 ${faces.size}"; binding.tvFaceLabel.visibility = View.VISIBLE }
         }
     }
+
     override fun onFaceAlert(count: Int) {
-        try { NotificationHelper.showFaceAlert(this, count) } catch (e: Exception) {}
+        try { NotificationHelper.showFaceAlert(this, count) } catch (_: Exception) {}
     }
+
     override fun onFaceRecognised(name: String, confidence: Float) {
         runOnUiThread {
             binding.tvFaceLabel.text = "✅ $name"
             binding.tvFaceLabel.visibility = View.VISIBLE
+            if (intruderMode?.isActive() == true) {
+                intruderMode?.deactivate()
+                binding.tvIntruderAlert.visibility = View.GONE
+            }
         }
         sendCameraEvent(CommandChannel.evtFace(name, true))
+        logEvent("face_known", name, confidence, "normal")
     }
+
     override fun onUnknownFace() {
         runOnUiThread {
             binding.tvFaceLabel.text = "❓ Unknown"
             binding.tvFaceLabel.visibility = View.VISIBLE
+            if (AppPreferences.intruderModeEnabled) {
+                intruderMode?.activate()
+                binding.tvIntruderAlert.visibility = View.VISIBLE
+            }
         }
-        try { NotificationHelper.showUnknownFaceAlert(this) } catch (e: Exception) {}
-        // Auto-record when unknown face detected regardless of autoRecordOnMotion setting
+        try { NotificationHelper.showUnknownFaceAlert(this) } catch (_: Exception) {}
         recorder?.startRecording(AppPreferences.getRecordingDirectory())
         sendCameraEvent(CommandChannel.evtFace("Unknown", false))
+        logEvent("face_unknown", "Unknown Person", 0f, "critical")
     }
+
     override fun onNightModeChanged(isNight: Boolean) {
         runOnUiThread {
-            binding.tvNightMode.visibility = if (isNight) View.VISIBLE else View.GONE
-            binding.btnNightMode.alpha = if (isNight) 1f else 0.5f
+            binding.tvNightMode.visibility  = if (isNight) View.VISIBLE else View.GONE
+            binding.btnNightMode.alpha      = if (isNight) 1f else 0.5f
         }
     }
 
-    // RecordingManager callbacks
+    // ── Recording callbacks ───────────────────────────────────────────────────
+
     override fun onRecordingStarted(path: String) {
         runOnUiThread {
             binding.tvRecordingIndicator.visibility = View.VISIBLE
             Toast.makeText(this, "🔴 Recording started", Toast.LENGTH_SHORT).show()
         }
         sendCameraEvent(CommandChannel.evtRecording(true))
+        logEvent("recording", path.substringAfterLast('/'), 0f, "normal")
     }
+
     override fun onRecordingStopped(path: String) {
         runOnUiThread {
             binding.tvRecordingIndicator.visibility = View.GONE
@@ -397,8 +440,21 @@ class CameraActivity : AppCompatActivity(),
         }
         sendCameraEvent(CommandChannel.evtRecording(false))
     }
+
     override fun onRecordingError(msg: String) {
         runOnUiThread { Toast.makeText(this, "⚠️ Recording: $msg", Toast.LENGTH_SHORT).show() }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private fun logEvent(type: String, label: String, confidence: Float, priority: String) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                eventDb?.eventDao()?.insert(
+                    EventRecord(type = type, label = label, confidence = confidence, priority = priority)
+                )
+            }
+        }
     }
 
     private fun updateStatus(msg: String, connected: Boolean) {
@@ -422,14 +478,15 @@ class CameraActivity : AppCompatActivity(),
     override fun onDestroy() {
         super.onDestroy()
         webRtcCapturerObserver = null
-        try { cameraProvider?.unbindAll() } catch (e: Exception) {}
-        try { ai?.release() } catch (e: Exception) {}
-        try { night?.release() } catch (e: Exception) {}
-        try { recorder?.release() } catch (e: Exception) {}
-        try { webRTCManager?.release() } catch (e: Exception) {}
-        try { signalingClient?.disconnect() } catch (e: Exception) {}
-        try { wsStream?.disconnect() } catch (e: Exception) {}
-        try { exec?.shutdown() } catch (e: Exception) {}
-        try { stopService(Intent(this, CameraStreamingService::class.java)) } catch (e: Exception) {}
+        try { cameraProvider?.unbindAll() } catch (_: Exception) {}
+        try { ai?.release() } catch (_: Exception) {}
+        try { night?.release() } catch (_: Exception) {}
+        try { recorder?.release() } catch (_: Exception) {}
+        try { webRTCManager?.release() } catch (_: Exception) {}
+        try { signalingClient?.disconnect() } catch (_: Exception) {}
+        try { wsStream?.disconnect() } catch (_: Exception) {}
+        try { exec?.shutdown() } catch (_: Exception) {}
+        try { intruderMode?.release() } catch (_: Exception) {}
+        try { stopService(Intent(this, CameraStreamingService::class.java)) } catch (_: Exception) {}
     }
 }
