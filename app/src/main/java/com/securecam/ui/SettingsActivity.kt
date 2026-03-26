@@ -27,6 +27,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.switchAutoNightMode.isChecked = AppPreferences.autoNightModeEnabled
         binding.switchAudioStream.isChecked = AppPreferences.audioStreamEnabled
         binding.switchFlashOnMotion.isChecked = AppPreferences.flashOnMotion
+        binding.switchAutoRecord.isChecked = AppPreferences.autoRecordOnMotion
         binding.seekbarMotionSensitivity.progress = AppPreferences.motionSensitivity
         binding.tvMotionSensitivityValue.text = "${AppPreferences.motionSensitivity}%"
         binding.seekbarVideoQuality.progress = AppPreferences.videoQuality
