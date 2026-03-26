@@ -11,13 +11,11 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- Back + Title -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical">
-
             <ImageButton
                 android:id="@+id/btnBack"
                 android:layout_width="40dp"
@@ -26,7 +24,6 @@
                 android:tint="@color/colorTextSecondary"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Back" />
-
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -38,129 +35,142 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- AI Features -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="8dp"
-            android:text="AI FEATURES"
-            android:textColor="@color/colorAccent"
-            android:textSize="11sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.15" />
+        <!-- AI FEATURES -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="24dp" android:layout_marginBottom="8dp"
+            android:text="AI FEATURES" android:textColor="@color/colorAccent"
+            android:textSize="11sp" android:textAllCaps="true" android:letterSpacing="0.15" />
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/colorCard"
+        <androidx.cardview.widget.CardView android:layout_width="match_parent"
+            android:layout_height="wrap_content" app:cardBackgroundColor="@color/colorCard"
             app:cardCornerRadius="12dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="4dp">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="4dp">
-
-                <!-- Motion Alerts -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
-                    android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="16dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="⚠️  Motion Alerts" android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="⚠️  Motion Alerts"
+                        android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
                     <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchMotionAlerts"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         app:thumbTint="@color/colorAccent" app:trackTint="@color/colorBorder" />
                 </LinearLayout>
 
-                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorBorder" android:layout_marginStart="16dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="@color/colorBorder" android:layout_marginStart="16dp" />
 
-                <!-- Face Detection -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
-                    android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="16dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="👤  Face Detection" android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="👤  Face Detection"
+                        android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
                     <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchFaceDetection"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         app:thumbTint="@color/colorAccent" app:trackTint="@color/colorBorder" />
                 </LinearLayout>
 
-                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorBorder" android:layout_marginStart="16dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="@color/colorBorder" android:layout_marginStart="16dp" />
 
-                <!-- Object Detection -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
-                    android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="16dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="🔍  Object Detection (TFLite)" android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="🔍  Object Detection"
+                        android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
                     <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchObjectDetection"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         app:thumbTint="@color/colorAccent" app:trackTint="@color/colorBorder" />
                 </LinearLayout>
 
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="@color/colorBorder" android:layout_marginStart="16dp" />
+
+                <!-- Intruder Mode -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="10dp" android:paddingBottom="10dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="🚨  Intruder Mode"
+                            android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Alarm + flash blink on unknown face"
+                            android:textColor="@color/colorTextHint" android:textSize="11sp"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchIntruderMode"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        app:thumbTint="@color/colorAccentRed" app:trackTint="@color/colorBorder" />
+                </LinearLayout>
+
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- Camera -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="8dp"
-            android:text="CAMERA"
-            android:textColor="@color/colorAccent"
-            android:textSize="11sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.15" />
+        <!-- CAMERA -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:layout_marginBottom="8dp"
+            android:text="CAMERA" android:textColor="@color/colorAccent"
+            android:textSize="11sp" android:textAllCaps="true" android:letterSpacing="0.15" />
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/colorCard"
+        <androidx.cardview.widget.CardView android:layout_width="match_parent"
+            android:layout_height="wrap_content" app:cardBackgroundColor="@color/colorCard"
             app:cardCornerRadius="12dp">
-
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical" android:padding="4dp">
 
-                <!-- Night Mode -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
-                    android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="16dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="🌙  Night Mode" android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="🌙  Night Mode"
+                        android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
                     <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchNightMode"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         app:thumbTint="@color/night_color" app:trackTint="@color/colorBorder" />
                 </LinearLayout>
 
-                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorBorder" android:layout_marginStart="16dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="@color/colorBorder" android:layout_marginStart="16dp" />
 
-                <!-- Auto Night Mode -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
-                    android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="16dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="🌗  Auto Night Mode" android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="🌗  Auto Night Mode"
+                        android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
                     <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchAutoNightMode"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         app:thumbTint="@color/night_color" app:trackTint="@color/colorBorder" />
                 </LinearLayout>
 
-                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorBorder" android:layout_marginStart="16dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="@color/colorBorder" android:layout_marginStart="16dp" />
 
-                <!-- Flash on Motion -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
-                    android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="16dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="⚡  Flash on Motion" android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="⚡  Flash on Motion"
+                        android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
                     <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchFlashOnMotion"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         app:thumbTint="@color/colorAccentOrange" app:trackTint="@color/colorBorder" />
                 </LinearLayout>
 
-                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorBorder" android:layout_marginStart="16dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="@color/colorBorder" android:layout_marginStart="16dp" />
 
-                <!-- Audio Stream -->
                 <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
-                    android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="16dp" android:paddingEnd="16dp">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="🎤  Audio Streaming" android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="🎤  Audio Streaming"
+                        android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
                     <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchAudioStream"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         app:thumbTint="@color/colorAccent" app:trackTint="@color/colorBorder" />
@@ -169,34 +179,25 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- Sensitivity -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="8dp"
-            android:text="SENSITIVITY &amp; QUALITY"
-            android:textColor="@color/colorAccent"
-            android:textSize="11sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.15" />
+        <!-- SENSITIVITY & QUALITY -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:layout_marginBottom="8dp"
+            android:text="SENSITIVITY &amp; QUALITY" android:textColor="@color/colorAccent"
+            android:textSize="11sp" android:textAllCaps="true" android:letterSpacing="0.15" />
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/colorCard"
+        <androidx.cardview.widget.CardView android:layout_width="match_parent"
+            android:layout_height="wrap_content" app:cardBackgroundColor="@color/colorCard"
             app:cardCornerRadius="12dp">
-
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical" android:padding="20dp">
-
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="Motion Sensitivity" android:textColor="@color/colorTextPrimary" android:textSize="14sp" />
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="Motion Sensitivity"
+                        android:textColor="@color/colorTextPrimary" android:textSize="14sp" />
                     <TextView android:id="@+id/tvMotionSensitivityValue" android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" android:text="40%" android:textColor="@color/colorAccent"
-                        android:textSize="14sp" android:textStyle="bold" />
+                        android:layout_height="wrap_content" android:text="40%"
+                        android:textColor="@color/colorAccent" android:textSize="14sp" android:textStyle="bold" />
                 </LinearLayout>
                 <SeekBar android:id="@+id/seekbarMotionSensitivity" android:layout_width="match_parent"
                     android:layout_height="wrap_content" android:layout_marginTop="8dp"
@@ -205,11 +206,12 @@
 
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="20dp" android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="Video Quality" android:textColor="@color/colorTextPrimary" android:textSize="14sp" />
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="Video Quality"
+                        android:textColor="@color/colorTextPrimary" android:textSize="14sp" />
                     <TextView android:id="@+id/tvVideoQualityValue" android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" android:text="High (720p)" android:textColor="@color/colorAccent"
-                        android:textSize="14sp" android:textStyle="bold" />
+                        android:layout_height="wrap_content" android:text="High (720p)"
+                        android:textColor="@color/colorAccent" android:textSize="14sp" android:textStyle="bold" />
                 </LinearLayout>
                 <SeekBar android:id="@+id/seekbarVideoQuality" android:layout_width="match_parent"
                     android:layout_height="wrap_content" android:layout_marginTop="8dp"
@@ -218,75 +220,52 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- Recording -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="8dp"
-            android:text="RECORDING"
-            android:textColor="@color/colorAccent"
-            android:textSize="11sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.15" />
+        <!-- RECORDING -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:layout_marginBottom="8dp"
+            android:text="RECORDING" android:textColor="@color/colorAccent"
+            android:textSize="11sp" android:textAllCaps="true" android:letterSpacing="0.15" />
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/colorCard"
+        <androidx.cardview.widget.CardView android:layout_width="match_parent"
+            android:layout_height="wrap_content" app:cardBackgroundColor="@color/colorCard"
             app:cardCornerRadius="12dp">
-
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical" android:padding="4dp">
-
-                <!-- Auto Record on Motion -->
-                <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:orientation="horizontal" android:gravity="center_vertical"
-                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    android:paddingStart="16dp" android:paddingEnd="16dp"
+                    android:paddingTop="10dp" android:paddingBottom="10dp">
                     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
                         android:layout_weight="1" android:orientation="vertical">
                         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                             android:text="🔴  Auto Record on Motion"
                             android:textColor="@color/colorTextPrimary" android:textSize="15sp" />
                         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="Starts recording when motion is detected. Stops after 10s of silence."
+                            android:text="Starts when motion detected, stops after 10s of silence."
                             android:textColor="@color/colorTextHint" android:textSize="11sp"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchAutoRecord"
+                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchAutoRecord"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         app:thumbTint="@color/colorAccentRed" app:trackTint="@color/colorBorder" />
                 </LinearLayout>
-
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- Server URL -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="8dp"
-            android:text="NETWORK"
-            android:textColor="@color/colorAccent"
-            android:textSize="11sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.15" />
+        <!-- NETWORK -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:layout_marginBottom="8dp"
+            android:text="NETWORK" android:textColor="@color/colorAccent"
+            android:textSize="11sp" android:textAllCaps="true" android:letterSpacing="0.15" />
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/colorCard"
+        <androidx.cardview.widget.CardView android:layout_width="match_parent"
+            android:layout_height="wrap_content" app:cardBackgroundColor="@color/colorCard"
             app:cardCornerRadius="12dp">
-
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical" android:padding="20dp">
-
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="Custom Signaling Server URL"
                     android:textColor="@color/colorTextSecondary" android:textSize="12sp" />
-
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etCustomServerUrl"
                     android:layout_width="match_parent"
@@ -297,12 +276,10 @@
                     android:textColorHint="@color/colorTextHint"
                     android:inputType="textUri"
                     android:background="@null" />
-
                 <Button android:id="@+id/btnSaveServer"
                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:text="Save" style="@style/ButtonPrimary" />
-
                 <TextView android:id="@+id/tvServerSaved"
                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -313,6 +290,5 @@
         </androidx.cardview.widget.CardView>
 
         <View android:layout_width="match_parent" android:layout_height="40dp" />
-
     </LinearLayout>
 </ScrollView>
