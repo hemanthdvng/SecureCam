@@ -24,6 +24,7 @@ import com.securecam.ai.MotionDetector
 import com.securecam.ai.ObjectDetectionManager
 import com.securecam.databinding.ActivityCameraBinding
 import com.securecam.ui.ConnectionActivity
+import com.securecam.ui.RecordingsActivity
 import com.securecam.utils.AppPreferences
 import com.securecam.utils.NightModeHelper
 import com.securecam.utils.NotificationHelper
@@ -127,7 +128,7 @@ class CameraActivity : AppCompatActivity(),
                         .build().also { it.setSurfaceProvider(binding.cameraPreviewView.surfaceProvider) }
 
                     val analysis = ImageAnalysis.Builder()
-                        .setTargetResolution(Size(1280, 720))
+                        .setTargetResolution(Size(1920, 1080))
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build().also { ia ->
                             ia.setAnalyzer(execLocal) { proxy ->
@@ -231,6 +232,9 @@ class CameraActivity : AppCompatActivity(),
             AlertDialog.Builder(this).setTitle("End Stream?")
                 .setPositiveButton("End") { _, _ -> finish() }
                 .setNegativeButton("Cancel", null).show()
+        }
+        binding.btnViewRecordings.setOnClickListener {
+            startActivity(Intent(this, RecordingsActivity::class.java))
         }
         binding.motionBar.max = 100
     }
@@ -367,6 +371,8 @@ class CameraActivity : AppCompatActivity(),
             binding.tvFaceLabel.visibility = View.VISIBLE
         }
         try { NotificationHelper.showUnknownFaceAlert(this) } catch (e: Exception) {}
+        // Auto-record when unknown face detected regardless of autoRecordOnMotion setting
+        recorder?.startRecording(AppPreferences.getRecordingDirectory())
         sendCameraEvent(CommandChannel.evtFace("Unknown", false))
     }
     override fun onNightModeChanged(isNight: Boolean) {
