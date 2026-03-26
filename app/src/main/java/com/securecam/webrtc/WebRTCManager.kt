@@ -222,6 +222,13 @@ class WebRTCManager(
                 // Camera sends video, receives viewer's PTT audio
                 mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
                 mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
+                // 1080p video constraints
+                optional.add(MediaConstraints.KeyValuePair("googHighStartBitrate", "4000"))
+                optional.add(MediaConstraints.KeyValuePair("maxWidth", "1920"))
+                optional.add(MediaConstraints.KeyValuePair("maxHeight", "1080"))
+                optional.add(MediaConstraints.KeyValuePair("minWidth", "1280"))
+                optional.add(MediaConstraints.KeyValuePair("minHeight", "720"))
+                optional.add(MediaConstraints.KeyValuePair("maxFrameRate", "30"))
             }
             peerConnection?.createOffer(sdpCallback { sdp ->
                 peerConnection?.setLocalDescription(sdpSetCallback { callback(sdp) }, sdp)
