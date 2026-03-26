@@ -15,45 +15,35 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
         setupUI()
     }
 
     private fun setupUI() {
-        binding.btnCamera.setOnClickListener {
-            openConnection(ConnectionActivity.MODE_CAMERA)
-        }
+        binding.btnCamera.setOnClickListener { openConnection(ConnectionActivity.MODE_CAMERA) }
+        binding.btnViewer.setOnClickListener { openConnection(ConnectionActivity.MODE_VIEWER) }
+        binding.btnSettings.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
+        binding.btnFaceManagement.setOnClickListener { startActivity(Intent(this, FaceManagementActivity::class.java)) }
+        binding.btnTimeline.setOnClickListener { startActivity(Intent(this, TimelineActivity::class.java)) }
+        binding.btnQRPair.setOnClickListener { startActivity(Intent(this, QRActivity::class.java)) }
 
-        binding.btnViewer.setOnClickListener {
-            openConnection(ConnectionActivity.MODE_VIEWER)
-        }
-
-        binding.btnSettings.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        }
-
-        // Show last used room code if any
         val lastRoom = AppPreferences.lastRoomCode
         if (lastRoom.isNotEmpty()) {
             binding.tvLastRoom.visibility = View.VISIBLE
-            binding.tvLastRoom.text = "Last room: $lastRoom"
-            binding.tvLastRoom.setOnClickListener {
-                openConnectionWithRoom(lastRoom)
-            }
+            binding.tvLastRoom.text       = "Last room: $lastRoom"
+            binding.tvLastRoom.setOnClickListener { openConnectionWithRoom(lastRoom) }
         }
-
-        binding.versionText.text = "SecureCam v1.0 • Encrypted Stream"
+        binding.versionText.text = "SecureCam v4.0 • WatchTower AI • Encrypted Stream"
     }
 
     private fun openConnection(mode: String) {
-        val intent = Intent(this, ConnectionActivity::class.java)
-        intent.putExtra(ConnectionActivity.EXTRA_MODE, mode)
-        startActivity(intent)
+        startActivity(Intent(this, ConnectionActivity::class.java).apply {
+            putExtra(ConnectionActivity.EXTRA_MODE, mode)
+        })
     }
 
     private fun openConnectionWithRoom(roomCode: String) {
-        val intent = Intent(this, ConnectionActivity::class.java)
-        intent.putExtra(ConnectionActivity.EXTRA_ROOM_CODE, roomCode)
-        startActivity(intent)
+        startActivity(Intent(this, ConnectionActivity::class.java).apply {
+            putExtra(ConnectionActivity.EXTRA_ROOM_CODE, roomCode)
+        })
     }
 }
