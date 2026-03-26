@@ -258,6 +258,16 @@
             android:textColor="@color/white"
             android:backgroundTint="@color/colorAccentRed"
             style="@style/Widget.MaterialComponents.Button"/>
+
+        <ImageButton
+            android:id="@+id/btnViewRecordings"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:src="@android:drawable/ic_menu_gallery"
+            android:tint="@color/colorAccentGreen"
+            android:background="@color/colorCard"
+            android:contentDescription="View Recordings"/>
     </LinearLayout>
 
 </FrameLayout>
