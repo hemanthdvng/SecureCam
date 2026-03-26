@@ -12,6 +12,7 @@ object NotificationHelper {
     private const val CH_AI       = "ai_alerts"
     private const val CH_STREAM   = "stream_service"
     private const val CH_SECURITY = "security_alerts"
+    private const val CH_INTRUDER = "intruder_alerts"
 
     private var notifId = 100
 
@@ -22,6 +23,13 @@ object NotificationHelper {
         nm.createNotificationChannel(NotificationChannel(CH_AI,       "AI Detections",   NotificationManager.IMPORTANCE_DEFAULT))
         nm.createNotificationChannel(NotificationChannel(CH_STREAM,   "Streaming",       NotificationManager.IMPORTANCE_LOW))
         nm.createNotificationChannel(NotificationChannel(CH_SECURITY, "Security Alerts", NotificationManager.IMPORTANCE_HIGH))
+        nm.createNotificationChannel(
+            NotificationChannel(CH_INTRUDER, "🚨 Intruder Alerts", NotificationManager.IMPORTANCE_HIGH).apply {
+                enableVibration(true)
+                enableLights(true)
+                lightColor = 0xFFFF0000.toInt()
+            }
+        )
     }
 
     fun showMotionAlert(context: Context, score: Float) {
@@ -31,7 +39,7 @@ object NotificationHelper {
 
     fun showObjectDetectionAlert(context: Context, label: String, confidence: Float) {
         val pct = "%.0f".format(confidence * 100)
-        notify(context, CH_AI, "🤖 $label detected", "Confidence: $pct%")
+        notify(context, CH_AI, "🔍 $label detected", "Confidence: $pct%")
     }
 
     fun showFaceAlert(context: Context, count: Int) {
@@ -40,6 +48,10 @@ object NotificationHelper {
 
     fun showUnknownFaceAlert(context: Context) {
         notify(context, CH_SECURITY, "❓ Unknown Person!", "Unrecognised face detected by camera")
+    }
+
+    fun showIntruderAlert(context: Context) {
+        notify(context, CH_INTRUDER, "🚨 INTRUDER DETECTED!", "Unknown person — immediate attention required")
     }
 
     fun showFaceRecognisedAlert(context: Context, name: String) {
@@ -64,6 +76,7 @@ object NotificationHelper {
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
         nm.notify(notifId++, n)
     }
