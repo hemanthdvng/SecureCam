@@ -12,11 +12,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Storage for recordings -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"  android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -42,18 +40,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".ui.MainActivity" android:exported="false" android:screenOrientation="portrait" />
-        <activity android:name=".ui.ConnectionActivity" android:exported="false" android:screenOrientation="portrait" />
-        <activity android:name=".camera.CameraActivity" android:exported="false"
-            android:screenOrientation="landscape" android:keepScreenOn="true"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
-        <activity android:name=".viewer.ViewerActivity" android:exported="false"
-            android:screenOrientation="landscape" android:keepScreenOn="true"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
-        <activity android:name=".ui.SettingsActivity" android:exported="false" android:screenOrientation="portrait" />
-        <activity android:name=".ui.RecordingsActivity" android:exported="false"
-            android:screenOrientation="portrait"
+
+        <activity android:name=".ui.MainActivity"         android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".ui.ConnectionActivity"   android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".ui.SettingsActivity"     android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".ui.RecordingsActivity"   android:exported="false" android:screenOrientation="portrait"
             android:parentActivityName=".camera.CameraActivity" />
+        <activity android:name=".ui.FaceManagementActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".ui.TimelineActivity"     android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".ui.QRActivity"           android:exported="false" android:screenOrientation="portrait" />
+
+        <activity android:name=".camera.CameraActivity"  android:exported="false"
+            android:screenOrientation="landscape" android:keepScreenOn="true"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".viewer.ViewerActivity"  android:exported="false"
+            android:screenOrientation="landscape" android:keepScreenOn="true"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
