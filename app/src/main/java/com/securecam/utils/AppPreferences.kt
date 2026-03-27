@@ -72,6 +72,35 @@ object AppPreferences {
         get() = prefs.getBoolean("auto_record_motion", false)
         set(value) = prefs.edit().putBoolean("auto_record_motion", value).apply()
 
+    // ── New prefs for v5 ──────────────────────────────────────────────────────
+    var alarmOnIntruderEnabled: Boolean
+        get() = prefs.getBoolean("alarm_on_intruder", true)
+        set(value) = prefs.edit().putBoolean("alarm_on_intruder", value).apply()
+
+    var detectPersons: Boolean
+        get() = prefs.getBoolean("detect_persons", true)
+        set(value) = prefs.edit().putBoolean("detect_persons", value).apply()
+
+    var detectVehicles: Boolean
+        get() = prefs.getBoolean("detect_vehicles", true)
+        set(value) = prefs.edit().putBoolean("detect_vehicles", value).apply()
+
+    var detectPackages: Boolean
+        get() = prefs.getBoolean("detect_packages", true)
+        set(value) = prefs.edit().putBoolean("detect_packages", value).apply()
+
+    var detectAnimals: Boolean
+        get() = prefs.getBoolean("detect_animals", false)
+        set(value) = prefs.edit().putBoolean("detect_animals", value).apply()
+
+    var maxRecordingDurationSec: Int
+        get() = prefs.getInt("max_rec_duration_sec", 15)
+        set(value) = prefs.edit().putInt("max_rec_duration_sec", value).apply()
+
+    var motionGracePeriodSec: Int
+        get() = prefs.getInt("motion_grace_sec", 10)
+        set(value) = prefs.edit().putInt("motion_grace_sec", value).apply()
+
     var recordingSaveLocation: Int
         get() = prefs.getInt("recording_location", 0)
         set(value) = prefs.edit().putInt("recording_location", value).apply()
