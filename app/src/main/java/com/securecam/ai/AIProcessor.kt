@@ -4,6 +4,13 @@ import android.content.Context
 import android.graphics.Bitmap
 import com.securecam.utils.AppPreferences
 
+/**
+ * Central AI pipeline. Wires MotionDetector → ObjectDetectionManager (YOLOv10-N)
+ * → FaceDetectionManager (unknown face / intruder).
+ *
+ * Priority classification bubbles up to CameraActivity which decides
+ * whether to trigger recording, notifications, and/or intruder alarm.
+ */
 class AIProcessor(
     private val context: Context,
     private val listener: AIEventListener
@@ -13,28 +20,22 @@ class AIProcessor(
 
     private var motionDetector: MotionDetector? = null
     private var objectDetector: ObjectDetectionManager? = null
-    private var faceDetector: FaceDetectionManager? = null
+    private var faceDetector:   FaceDetectionManager? = null
     private var frameCount = 0L
 
-    var lastMotionScore = 0f
-        private set
-    var lastDetectedObjects = listOf<ObjectDetectionManager.DetectedObject>()
-        private set
-    var lastDetectedFaces = listOf<FaceDetectionManager.DetectedFace>()
-        private set
+    var lastMotionScore      = 0f;                                        private set
+    var lastDetectedObjects  = listOf<ObjectDetectionManager.DetectedObject>(); private set
+    var lastDetectedFaces    = listOf<FaceDetectionManager.DetectedFace>();     private set
 
     val faceDatabase: KnownFaceDatabase? get() = faceDetector?.faceDatabase
 
     fun initialize() {
-        if (AppPreferences.motionAlertsEnabled) {
+        if (AppPreferences.motionAlertsEnabled)
             motionDetector = MotionDetector(AppPreferences.motionSensitivity, this)
-        }
-        if (AppPreferences.objectDetectionEnabled) {
-            objectDetector = ObjectDetectionManager(this).also { it.initialize() }
-        }
-        if (AppPreferences.faceDetectionEnabled) {
+        if (AppPreferences.objectDetectionEnabled)
+            objectDetector = ObjectDetectionManager(context, this).also { it.initialize() }
+        if (AppPreferences.faceDetectionEnabled)
             faceDetector = FaceDetectionManager(context, this).also { it.initialize() }
-        }
     }
 
     fun processFrame(bitmap: Bitmap) {
@@ -48,7 +49,7 @@ class AIProcessor(
         faceDetector?.registerFace(name, bitmap)
     }
 
-    // MotionDetector callbacks
+    // ── MotionDetector callbacks ──────────────────────────────────────────────
     override fun onMotionDetected(score: Float, regions: List<MotionDetector.MotionRegion>) {
         lastMotionScore = score
         listener.onMotionAlert(score, regions)
@@ -58,16 +59,19 @@ class AIProcessor(
         listener.onMotionScoreUpdate(score)
     }
 
-    // ObjectDetection callbacks
+    // ── ObjectDetection callbacks ─────────────────────────────────────────────
     override fun onObjectsDetected(objects: List<ObjectDetectionManager.DetectedObject>) {
         lastDetectedObjects = objects
         listener.onObjectsUpdate(objects)
     }
-    override fun onObjectAlert(label: String, confidence: Float) {
-        listener.onObjectAlert(label, confidence)
+    override fun onObjectAlert(
+        label: String, group: String, confidence: Float,
+        priority: String, reappeared: Boolean
+    ) {
+        listener.onObjectAlert(label, group, confidence, priority, reappeared)
     }
 
-    // FaceDetection callbacks
+    // ── FaceDetection callbacks ───────────────────────────────────────────────
     override fun onFacesDetected(faces: List<FaceDetectionManager.DetectedFace>) {
         lastDetectedFaces = faces
         listener.onFacesUpdate(faces)
@@ -76,15 +80,9 @@ class AIProcessor(
         lastDetectedFaces = emptyList()
         listener.onFacesUpdate(emptyList())
     }
-    override fun onFaceAlert(count: Int) {
-        listener.onFaceAlert(count)
-    }
-    override fun onFaceRecognised(name: String, confidence: Float) {
-        listener.onFaceRecognised(name, confidence)
-    }
-    override fun onUnknownFace() {
-        listener.onUnknownFace()
-    }
+    override fun onFaceAlert(count: Int)                      = listener.onFaceAlert(count)
+    override fun onFaceRecognised(name: String, conf: Float)  = listener.onFaceRecognised(name, conf)
+    override fun onUnknownFace()                              = listener.onUnknownFace()
 
     fun release() {
         motionDetector?.release()
@@ -96,7 +94,7 @@ class AIProcessor(
         fun onMotionAlert(score: Float, regions: List<MotionDetector.MotionRegion>)
         fun onMotionScoreUpdate(score: Float)
         fun onObjectsUpdate(objects: List<ObjectDetectionManager.DetectedObject>)
-        fun onObjectAlert(label: String, confidence: Float)
+        fun onObjectAlert(label: String, group: String, confidence: Float, priority: String, reappeared: Boolean)
         fun onFacesUpdate(faces: List<FaceDetectionManager.DetectedFace>)
         fun onFaceAlert(count: Int)
         fun onFaceRecognised(name: String, confidence: Float)
