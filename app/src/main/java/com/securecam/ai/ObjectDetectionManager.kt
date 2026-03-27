@@ -77,13 +77,15 @@ class ObjectDetectionManager(
         Interpreter(buf, Interpreter.Options().apply { numThreads = 4 })
     } catch (_: Exception) { null }
 
-    private fun tryLoadFromFiles(name: String): Interpreter? = try {
-        val file = File(context.filesDir, name)
-        if (!file.exists()) return null
-        val buf = FileInputStream(file).channel
-            .map(FileChannel.MapMode.READ_ONLY, 0, file.length())
-        Interpreter(buf, Interpreter.Options().apply { numThreads = 4 })
-    } catch (_: Exception) { null }
+    private fun tryLoadFromFiles(name: String): Interpreter? {
+        return try {
+            val file = File(context.filesDir, name)
+            if (!file.exists()) return null
+            val buf = FileInputStream(file).channel
+                .map(FileChannel.MapMode.READ_ONLY, 0, file.length())
+            Interpreter(buf, Interpreter.Options().apply { numThreads = 4 })
+        } catch (_: Exception) { null }
+    }
 
     fun processFrame(bitmap: Bitmap) {
         val now = System.currentTimeMillis()
