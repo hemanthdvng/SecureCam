@@ -1,6 +1,7 @@
 package com.securecam.viewer
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.MotionEvent
@@ -9,8 +10,10 @@ import android.view.WindowManager
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import com.securecam.databinding.ActivityViewerBinding
 import com.securecam.ui.ConnectionActivity
+import com.securecam.utils.AppPreferences
 import com.securecam.utils.NotificationHelper
 import com.securecam.webrtc.CommandChannel
 import com.securecam.webrtc.SignalingClient
@@ -18,6 +21,9 @@ import com.securecam.webrtc.WebRTCManager
 import com.securecam.websocket.WebSocketStreamManager
 import org.json.JSONObject
 import org.webrtc.IceCandidate
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
 class ViewerActivity : AppCompatActivity() {
 
@@ -32,24 +38,32 @@ class ViewerActivity : AppCompatActivity() {
     private var signalingClient: SignalingClient? = null
     private var wsStreamManager: WebSocketStreamManager? = null
 
-    private var isFullscreen = false
+    private var isFullscreen   = false
     private var cameraConnected = false
-    private var nightModeOn = false
-    private var torchOn = false
-    private var currentZoom = 1f
+    private var nightModeOn    = false
+    private var torchOn        = false
+    private var currentZoom    = 1f
+
+    // Tab state
+    private var currentTab = TAB_LIVE   // "live" | "recordings"
+
+    companion object {
+        const val TAB_LIVE       = "live"
+        const val TAB_RECORDINGS = "recordings"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityViewerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        AppPreferences.init(this)
 
         roomCode       = intent.getStringExtra(ConnectionActivity.EXTRA_ROOM_CODE) ?: ""
         connectionType = intent.getStringExtra(ConnectionActivity.EXTRA_CONNECTION_TYPE) ?: ConnectionActivity.TYPE_WEBRTC
         serverUrl      = intent.getStringExtra(ConnectionActivity.EXTRA_SERVER_URL) ?: ""
 
         setupUI()
-
         if (connectionType == ConnectionActivity.TYPE_WEBRTC) initWebRTC() else initWebSocket()
     }
 
@@ -59,9 +73,12 @@ class ViewerActivity : AppCompatActivity() {
         binding.tvConnectionType.text = connectionType.uppercase()
         updateStatus("Connecting…", false)
 
-        // Show/hide controls on tap
-        val tapTargets = listOf<View>(binding.remoteVideoView, binding.wsFrameView)
-        tapTargets.forEach { v ->
+        // Tab buttons
+        binding.btnTabLive.setOnClickListener { switchTab(TAB_LIVE) }
+        binding.btnTabRecordings.setOnClickListener { switchTab(TAB_RECORDINGS) }
+
+        // Live view tap → toggle controls
+        listOf<View>(binding.remoteVideoView, binding.wsFrameView).forEach { v ->
             v.setOnClickListener {
                 val vis = binding.controlsOverlay.visibility == View.VISIBLE
                 binding.controlsOverlay.visibility = if (vis) View.GONE else View.VISIBLE
@@ -71,7 +88,6 @@ class ViewerActivity : AppCompatActivity() {
         binding.btnFullscreen.setOnClickListener { toggleFullscreen() }
         binding.btnDisconnect.setOnClickListener { finish() }
 
-        // Night mode toggle — sends command to camera
         binding.btnNightMode.setOnClickListener {
             nightModeOn = !nightModeOn
             binding.btnNightMode.alpha = if (nightModeOn) 1f else 0.5f
@@ -79,26 +95,23 @@ class ViewerActivity : AppCompatActivity() {
             sendCommand(CommandChannel.nightMode(nightModeOn))
         }
 
-        // Torch toggle
         binding.btnTorch.setOnClickListener {
             torchOn = !torchOn
             binding.btnTorch.alpha = if (torchOn) 1f else 0.5f
             sendCommand(CommandChannel.torch(torchOn))
         }
 
-        // Switch camera
         binding.btnSwitchCamera.setOnClickListener {
             sendCommand(CommandChannel.switchCamera())
             Toast.makeText(this, "Switching camera…", Toast.LENGTH_SHORT).show()
         }
 
-        // Zoom seekbar (1x–5x)
-        binding.seekZoom.max = 40  // 0..40 → 1x..5x
+        binding.seekZoom.max = 40
         binding.seekZoom.progress = 0
         binding.seekZoom.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (!fromUser) return
-                currentZoom = 1f + progress / 10f   // 1.0 → 5.0
+                currentZoom = 1f + progress / 10f
                 binding.tvZoomLabel.text = "%.1f×".format(currentZoom)
                 sendCommand(CommandChannel.zoom(currentZoom))
             }
@@ -107,7 +120,6 @@ class ViewerActivity : AppCompatActivity() {
         })
         binding.tvZoomLabel.text = "1.0×"
 
-        // PTT — send audio to camera while held
         binding.btnPtt.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -119,13 +131,69 @@ class ViewerActivity : AppCompatActivity() {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     webRTCManager?.setPttActive(false)
                     binding.btnPtt.alpha = 0.55f
-                    binding.tvPttLabel.text = "Hold to Speak"
                     binding.tvPttLabel.visibility = View.GONE
                 }
             }
             true
         }
+
+        switchTab(TAB_LIVE)
     }
+
+    // ── Tab switching ─────────────────────────────────────────────────────────
+
+    private fun switchTab(tab: String) {
+        currentTab = tab
+        val liveActive = tab == TAB_LIVE
+
+        // Tab button states
+        binding.btnTabLive.alpha       = if (liveActive) 1f else 0.45f
+        binding.btnTabRecordings.alpha = if (!liveActive) 1f else 0.45f
+
+        // Show/hide panels
+        binding.livePanel.visibility       = if (liveActive) View.VISIBLE else View.GONE
+        binding.recordingsPanel.visibility = if (!liveActive) View.VISIBLE else View.GONE
+
+        if (!liveActive) loadRecordings()
+    }
+
+    private fun loadRecordings() {
+        val dir   = AppPreferences.getRecordingDirectory()
+        val files = dir.listFiles()
+            ?.filter { it.extension == "mp4" }
+            ?.sortedByDescending { it.lastModified() }
+            ?: emptyList()
+
+        val rv     = binding.rvRecordings
+        val tvEmpty = binding.tvNoRecordings
+
+        if (files.isEmpty()) {
+            tvEmpty.visibility = View.VISIBLE
+            rv.visibility      = View.GONE
+            return
+        }
+
+        tvEmpty.visibility = View.GONE
+        rv.visibility      = View.VISIBLE
+        rv.layoutManager   = androidx.recyclerview.widget.LinearLayoutManager(this)
+        rv.adapter         = RecordingsAdapter(files) { file -> playFile(file) }
+    }
+
+    private fun playFile(file: File) {
+        try {
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            startActivity(
+                Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "video/mp4")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            )
+        } catch (e: Exception) {
+            Toast.makeText(this, "No video player found", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ── WebRTC ────────────────────────────────────────────────────────────────
 
     private fun initWebRTC() {
         webRTCManager = WebRTCManager(this, false, object : WebRTCManager.WebRTCListener {
@@ -133,55 +201,31 @@ class ViewerActivity : AppCompatActivity() {
                 signalingClient?.sendIceCandidate(candidate.sdp, candidate.sdpMid, candidate.sdpMLineIndex)
             }
             override fun onConnectionEstablished() {
-                runOnUiThread {
-                    cameraConnected = true
-                    updateStatus("🟢 Live", true)
-                    binding.tvWaiting.visibility = View.GONE
-                }
+                runOnUiThread { cameraConnected = true; updateStatus("🟢 Live", true); binding.tvWaiting.visibility = View.GONE }
             }
             override fun onConnectionFailed() {
-                runOnUiThread {
-                    cameraConnected = false
-                    updateStatus("❌ Stream Lost", false)
-                    binding.tvWaiting.visibility = View.VISIBLE
-                }
+                runOnUiThread { cameraConnected = false; updateStatus("❌ Stream Lost", false); binding.tvWaiting.visibility = View.VISIBLE }
             }
             override fun onRemoteVideoReceived() {
-                runOnUiThread {
-                    binding.tvWaiting.visibility = View.GONE
-                    binding.remoteVideoView.visibility = View.VISIBLE
-                }
+                runOnUiThread { binding.tvWaiting.visibility = View.GONE; binding.remoteVideoView.visibility = View.VISIBLE }
             }
-            override fun onDataChannelMessage(json: String) {
-                runOnUiThread { handleCameraEvent(json) }
-            }
+            override fun onDataChannelMessage(json: String) { runOnUiThread { handleCameraEvent(json) } }
         })
-
         webRTCManager?.initialize()
         webRTCManager?.initRemoteRenderer(binding.remoteVideoView)
         webRTCManager?.createViewerMicTrack()
 
         signalingClient = SignalingClient(serverUrl, roomCode, false, object : SignalingClient.SignalingListener {
-            override fun onConnected() { runOnUiThread { updateStatus("⏳ Waiting for camera…", false) } }
-            override fun onDisconnected() { runOnUiThread { updateStatus("Disconnected", false) } }
-            override fun onPeerJoined() { runOnUiThread { updateStatus("Camera found — connecting…", false) } }
-            override fun onPeerLeft() {
-                runOnUiThread {
-                    cameraConnected = false
-                    updateStatus("⏳ Camera disconnected…", false)
-                    binding.tvWaiting.visibility = View.VISIBLE
-                }
-            }
+            override fun onConnected()     { runOnUiThread { updateStatus("⏳ Waiting for camera…", false) } }
+            override fun onDisconnected()  { runOnUiThread { updateStatus("Disconnected", false) } }
+            override fun onPeerJoined()    { runOnUiThread { updateStatus("Camera found — connecting…", false) } }
+            override fun onPeerLeft()      { runOnUiThread { cameraConnected = false; updateStatus("⏳ Camera disconnected…", false); binding.tvWaiting.visibility = View.VISIBLE } }
             override fun onOfferReceived(sdp: String) {
                 webRTCManager?.createPeerConnection(binding.remoteVideoView)
-                webRTCManager?.setRemoteOffer(sdp) { answer ->
-                    signalingClient?.sendAnswer(answer.description)
-                }
+                webRTCManager?.setRemoteOffer(sdp) { answer -> signalingClient?.sendAnswer(answer.description) }
             }
             override fun onAnswerReceived(sdp: String) {}
-            override fun onIceCandidateReceived(c: String, m: String, i: Int) {
-                webRTCManager?.addIceCandidate(c, m, i)
-            }
+            override fun onIceCandidateReceived(c: String, m: String, i: Int) { webRTCManager?.addIceCandidate(c, m, i) }
             override fun onError(message: String) { runOnUiThread { updateStatus("⚠️ $message", false) } }
         })
         signalingClient?.connect()
@@ -197,10 +241,11 @@ class ViewerActivity : AppCompatActivity() {
                     NotificationHelper.showMotionAlert(this, score)
                 }
                 CommandChannel.EVT_FACE -> {
-                    val name = obj.optString("label", "")
+                    val name  = obj.optString("label", "")
                     val known = obj.optBoolean("known", false)
                     if (known) {
                         showAlert(binding.tvAiAlert, "✅ $name", 3000)
+                        NotificationHelper.showFaceRecognisedAlert(this, name)
                     } else {
                         showAlert(binding.tvAiAlert, "❓ Unknown person!", 5000)
                         NotificationHelper.showUnknownFaceAlert(this)
@@ -208,12 +253,15 @@ class ViewerActivity : AppCompatActivity() {
                 }
                 CommandChannel.EVT_OBJECT -> {
                     val label = obj.optString("label", "")
-                    val conf = obj.optDouble("confidence", 0.0).toFloat()
-                    showAlert(binding.tvAiAlert, "🤖 $label (${"%.0f".format(conf * 100)}%)", 3000)
+                    val conf  = obj.optDouble("confidence", 0.0).toFloat()
+                    val group = obj.optString("group", "object")
+                    showAlert(binding.tvAiAlert, "${groupIcon(group)} $label (${"%.0f".format(conf * 100)}%)", 3000)
                 }
                 CommandChannel.EVT_RECORDING -> {
                     val active = obj.optBoolean("active", false)
                     binding.tvRecordingIndicator.visibility = if (active) View.VISIBLE else View.GONE
+                    // Refresh recordings list if on that tab
+                    if (!active && currentTab == TAB_RECORDINGS) loadRecordings()
                 }
                 CommandChannel.EVT_NIGHT_STATE -> {
                     nightModeOn = obj.optBoolean("on", false)
@@ -225,7 +273,11 @@ class ViewerActivity : AppCompatActivity() {
                     binding.btnTorch.alpha = if (torchOn) 1f else 0.5f
                 }
             }
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
+    }
+
+    private fun groupIcon(group: String) = when (group) {
+        "person"  -> "🧍"; "vehicle" -> "🚗"; "package" -> "📦"; "animal" -> "🐾"; else -> "🔍"
     }
 
     private fun showAlert(view: View, text: String, durationMs: Long) {
@@ -235,28 +287,21 @@ class ViewerActivity : AppCompatActivity() {
         view.postDelayed({ view.visibility = View.GONE }, durationMs)
     }
 
-    private fun sendCommand(json: String) {
-        webRTCManager?.sendCommand(json)
-    }
+    private fun sendCommand(json: String) { webRTCManager?.sendCommand(json) }
 
     private fun initWebSocket() {
         wsStreamManager = WebSocketStreamManager(serverUrl, roomCode, false,
             object : WebSocketStreamManager.StreamListener {
-                override fun onConnected() { runOnUiThread { updateStatus("⏳ Waiting…", false) } }
+                override fun onConnected()    { runOnUiThread { updateStatus("⏳ Waiting…", false) } }
                 override fun onDisconnected() { runOnUiThread { updateStatus("Disconnected", false) } }
-                override fun onPeerJoined() { runOnUiThread { updateStatus("Camera found…", false) } }
-                override fun onPeerLeft() {
-                    runOnUiThread {
-                        updateStatus("📷 Camera disconnected", false)
-                        binding.tvWaiting.visibility = View.VISIBLE
-                    }
-                }
+                override fun onPeerJoined()   { runOnUiThread { updateStatus("Camera found…", false) } }
+                override fun onPeerLeft()     { runOnUiThread { updateStatus("📷 Camera disconnected", false); binding.tvWaiting.visibility = View.VISIBLE } }
                 override fun onFrameReceived(frameData: ByteArray) {
                     val bmp = BitmapFactory.decodeByteArray(frameData, 0, frameData.size)
                     runOnUiThread {
                         binding.wsFrameView.setImageBitmap(bmp)
                         binding.wsFrameView.visibility = View.VISIBLE
-                        binding.tvWaiting.visibility = View.GONE
+                        binding.tvWaiting.visibility   = View.GONE
                         if (!cameraConnected) { cameraConnected = true; updateStatus("🟢 Live (Relay)", true) }
                     }
                 }
@@ -277,19 +322,11 @@ class ViewerActivity : AppCompatActivity() {
 
     private fun toggleFullscreen() {
         isFullscreen = !isFullscreen
-        if (isFullscreen) {
-            binding.controlsOverlay.visibility = View.GONE
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            )
-        } else {
-            binding.controlsOverlay.visibility = View.VISIBLE
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
-        }
+        binding.controlsOverlay.visibility = if (isFullscreen) View.GONE else View.VISIBLE
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = if (isFullscreen)
+            View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        else View.SYSTEM_UI_FLAG_VISIBLE
     }
 
     private fun updateStatus(msg: String, connected: Boolean) {
@@ -299,10 +336,43 @@ class ViewerActivity : AppCompatActivity() {
         )
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (currentTab == TAB_RECORDINGS) loadRecordings()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         webRTCManager?.release()
         signalingClient?.disconnect()
         wsStreamManager?.disconnect()
+    }
+}
+
+// ── Recordings adapter ────────────────────────────────────────────────────────
+
+class RecordingsAdapter(
+    private val files: List<File>,
+    private val onPlay: (File) -> Unit
+) : androidx.recyclerview.widget.RecyclerView.Adapter<RecordingsAdapter.VH>() {
+
+    class VH(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
+        val tvName: android.widget.TextView = view.findViewById(com.securecam.R.id.tvRecFileName)
+        val tvMeta: android.widget.TextView = view.findViewById(com.securecam.R.id.tvRecMeta)
+    }
+
+    override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int) =
+        VH(android.view.LayoutInflater.from(parent.context)
+            .inflate(com.securecam.R.layout.item_recording, parent, false))
+
+    override fun getItemCount() = files.size
+
+    override fun onBindViewHolder(holder: VH, position: Int) {
+        val f    = files[position]
+        val date = SimpleDateFormat("MMM dd  HH:mm", Locale.getDefault()).format(Date(f.lastModified()))
+        val mb   = "%.1f MB".format(f.length() / 1_048_576.0)
+        holder.tvName.text = f.name
+        holder.tvMeta.text = "$date  ·  $mb"
+        holder.itemView.setOnClickListener { onPlay(f) }
     }
 }
