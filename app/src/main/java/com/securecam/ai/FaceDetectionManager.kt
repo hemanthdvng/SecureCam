@@ -7,10 +7,11 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.*
 
 /**
- * Fixed FaceDetectionManager:
- *  - Recognition runs every frame pass (cooldown reduced to 3s per-face by trackingId)
- *  - Fires onFaceRecognised / onUnknownFace reliably every cooldown window
- *  - Per-trackingId cooldown prevents spam without suppressing detection
+ * Enhanced FaceDetectionManager v2:
+ * - PERFORMANCE_MODE_ACCURATE: detects faces at steeper angles, smaller faces
+ * - LANDMARK_MODE_ALL: enables eye positions for crop alignment
+ * - Per-face cooldown prevents spam without suppressing detection
+ * - Eye landmarks forwarded to FaceRecognitionManager.cropAndAlignFace()
  */
 class FaceDetectionManager(
     private val context: Context,
@@ -23,13 +24,11 @@ class FaceDetectionManager(
 
     private var isProcessing = false
     private var lastDetectionTime = 0L
-    private val DETECTION_INTERVAL_MS = 350L
+    private val DETECTION_INTERVAL_MS = 400L
 
-    // Per-trackingId cooldown — avoids duplicate alerts for same face
     private val faceAlertCooldown = mutableMapOf<Int, Long>()
-    private val FACE_ALERT_COOLDOWN_MS = 8_000L   // 8 s per unique face
+    private val FACE_ALERT_COOLDOWN_MS = 8_000L
 
-    // Global unknown face cooldown
     private var lastUnknownAlertTime = 0L
     private val UNKNOWN_ALERT_COOLDOWN_MS = 6_000L
 
@@ -37,16 +36,16 @@ class FaceDetectionManager(
 
     fun initialize() {
         val options = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)  // faster for real-time
-            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)        // skip landmarks for speed
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)   // eyes, nose, mouth
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
-            .setMinFaceSize(0.06f)   // detect smaller faces
+            .setMinFaceSize(0.05f)
             .enableTracking()
             .build()
         detector = FaceDetection.getClient(options)
         recognitionManager = FaceRecognitionManager(context).also { it.initialize() }
         faceDatabase = KnownFaceDatabase(context)
-        Log.d(TAG, "FaceDetectionManager ready. Recognition=${recognitionManager?.isAvailable}")
+        Log.d(TAG, "FaceDetectionManager ready — ACCURATE+LANDMARKS. model=${recognitionManager?.currentModelName}")
     }
 
     fun processFrame(bitmap: Bitmap) {
@@ -59,6 +58,8 @@ class FaceDetectionManager(
         detector?.process(image)
             ?.addOnSuccessListener { mlFaces ->
                 val results = mlFaces.map { face ->
+                    val leftEye  = face.getLandmark(FaceLandmark.LEFT_EYE)?.position
+                    val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position
                     DetectedFace(
                         trackingId  = face.trackingId ?: -1,
                         boundingBox = BoundingBox(
@@ -70,14 +71,19 @@ class FaceDetectionManager(
                         rightEyeOpenProbability = face.rightEyeOpenProbability ?: -1f,
                         headEulerAngleY = face.headEulerAngleY,
                         headEulerAngleZ = face.headEulerAngleZ,
-                        landmarks = emptyMap()
+                        landmarks = buildMap {
+                            leftEye?.let  { put("leftEye",  Pair(it.x, it.y)) }
+                            rightEye?.let { put("rightEye", Pair(it.x, it.y)) }
+                            face.getLandmark(FaceLandmark.NOSE_BASE)?.position?.let  { put("nose",       Pair(it.x, it.y)) }
+                            face.getLandmark(FaceLandmark.LEFT_MOUTH)?.position?.let { put("mouthLeft",  Pair(it.x, it.y)) }
+                            face.getLandmark(FaceLandmark.RIGHT_MOUTH)?.position?.let{ put("mouthRight", Pair(it.x, it.y)) }
+                        }
                     )
                 }
 
                 if (results.isNotEmpty()) {
                     listener.onFacesDetected(results)
                     if (lastFaceCount == 0) listener.onFaceAlert(results.size)
-                    // Run recognition on every detection pass (gated per-face by cooldown)
                     runRecognition(bitmap, mlFaces, now)
                 } else {
                     listener.onNoFaceDetected()
@@ -97,12 +103,23 @@ class FaceDetectionManager(
 
         for (face in faces) {
             val tid = face.trackingId ?: -1
-            // Per-face cooldown check
             if (now - (faceAlertCooldown[tid] ?: 0L) < FACE_ALERT_COOLDOWN_MS) continue
 
             try {
-                val bb   = face.boundingBox
-                val crop = rm.cropFace(fullBitmap, bb.left, bb.top, bb.right, bb.bottom)
+                val bb       = face.boundingBox
+                val leftEye  = face.getLandmark(FaceLandmark.LEFT_EYE)?.position
+                val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position
+
+                // Use eye-based alignment when landmarks are available
+                val crop = if (leftEye != null && rightEye != null) {
+                    rm.cropAndAlignFace(
+                        fullBitmap,
+                        bb.left, bb.top, bb.right, bb.bottom,
+                        leftEye.x, leftEye.y, rightEye.x, rightEye.y
+                    )
+                } else {
+                    rm.cropFace(fullBitmap, bb.left, bb.top, bb.right, bb.bottom)
+                }
 
                 val matched: Pair<String, Float>? = if (rm.isAvailable) {
                     val emb = rm.generateEmbedding(crop)
@@ -115,7 +132,6 @@ class FaceDetectionManager(
                     faceAlertCooldown[tid] = now
                     listener.onFaceRecognised(matched.first, matched.second)
                 } else if (!db.isEmpty()) {
-                    // Only fire unknown alert if DB has faces (otherwise nobody enrolled yet)
                     if (now - lastUnknownAlertTime > UNKNOWN_ALERT_COOLDOWN_MS) {
                         lastUnknownAlertTime = now
                         faceAlertCooldown[tid] = now
