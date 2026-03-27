@@ -1,10 +1,14 @@
 package com.securecam.camera
 
+import android.content.ContentValues
 import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
 import android.view.View
@@ -41,11 +45,19 @@ import com.securecam.websocket.WebSocketStreamManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import org.webrtc.CapturerObserver
 import org.webrtc.IceCandidate
 import org.webrtc.NV21Buffer
 import org.webrtc.VideoFrame
+import java.io.File
+import java.io.FileOutputStream
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -69,6 +81,7 @@ class CameraActivity : AppCompatActivity(),
     private var recorder: RecordingManager? = null
     private var intruderMode: IntruderModeManager? = null
     private var eventDb: EventDatabase? = null
+    private var httpServer: RecordingHttpServer? = null   // serves recordings to viewer
 
     private var webRtcCapturerObserver: CapturerObserver? = null
     private var isBackCamera = true
@@ -78,6 +91,7 @@ class CameraActivity : AppCompatActivity(),
     private var torchEnabled = false
     private var currentZoom = 1f
     private var boundCamera: androidx.camera.core.Camera? = null
+    private var lastFrameBitmap: Bitmap? = null   // for snapshot command
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -149,6 +163,8 @@ class CameraActivity : AppCompatActivity(),
                             ia.setAnalyzer(execLocal) { proxy ->
                                 try {
                                     val bmp = proxy.toBitmap()
+                                    // Store latest frame for snapshot command
+                                    lastFrameBitmap = bmp.copy(bmp.config ?: Bitmap.Config.ARGB_8888, false)
                                     ai?.processFrame(bmp)
                                     night?.analyzeFrameBrightness(bmp)
                                     if (connectionType == ConnectionActivity.TYPE_WEBSOCKET && isStreaming)
@@ -251,13 +267,14 @@ class CameraActivity : AppCompatActivity(),
         binding.btnTimeline.setOnClickListener {
             startActivity(Intent(this, TimelineActivity::class.java))
         }
-        // Dismiss intruder mode on tap of the intruder banner
         binding.tvIntruderAlert.setOnClickListener {
             intruderMode?.deactivate()
             binding.tvIntruderAlert.visibility = View.GONE
         }
         binding.motionBar.max = 100
     }
+
+    // ── Viewer command handling ───────────────────────────────────────────────
 
     private fun handleViewerCommand(json: String) {
         try {
@@ -284,8 +301,132 @@ class CameraActivity : AppCompatActivity(),
                     isBackCamera = !isBackCamera
                     runOnUiThread { startCamera() }
                 }
+                CommandChannel.CMD_SNAPSHOT -> {
+                    handleSnapshotCommand()
+                }
+                CommandChannel.CMD_RECORD_TOGGLE -> {
+                    val start = obj.optBoolean("start", false)
+                    if (start) recorder?.startRecording(AppPreferences.getRecordingDirectory())
+                    else       recorder?.stopRecording()
+                }
+                CommandChannel.CMD_LIST_RECORDINGS -> {
+                    handleListRecordingsCommand()
+                }
             }
         } catch (e: Exception) { Log.e(TAG, "handleViewerCommand: ${e.message}") }
+    }
+
+    private fun handleSnapshotCommand() {
+        val bmp = lastFrameBitmap ?: run {
+            Log.w(TAG, "Snapshot requested but no frame available")
+            return
+        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            val path = saveSnapshotToGallery(bmp)
+            withContext(Dispatchers.Main) {
+                if (path != null) {
+                    sendCameraEvent(CommandChannel.evtSnapshotSaved(path))
+                    Toast.makeText(this@CameraActivity, "📸 Snapshot saved", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@CameraActivity, "Snapshot failed", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun handleListRecordingsCommand() {
+        // Ensure HTTP server is running
+        startRecordingHttpServer()
+
+        // Send recording file list
+        lifecycleScope.launch(Dispatchers.IO) {
+            val dir   = AppPreferences.getRecordingDirectory()
+            val files = dir.listFiles()
+                ?.filter { it.isFile && it.extension.lowercase() == "mp4" }
+                ?.sortedByDescending { it.lastModified() }
+                ?: emptyList()
+            val arr = JSONArray()
+            files.forEach { f ->
+                arr.put(JSONObject().apply {
+                    put("name",     f.name)
+                    put("size",     f.length())
+                    put("modified", f.lastModified())
+                    put("sizeMb",   "%.1f".format(f.length() / 1_048_576.0))
+                })
+            }
+            withContext(Dispatchers.Main) {
+                sendCameraEvent(CommandChannel.evtRecordingList(arr.toString()))
+            }
+        }
+    }
+
+    private fun startRecordingHttpServer() {
+        try {
+            if (httpServer == null || !httpServer!!.isAlive) {
+                httpServer = RecordingHttpServer(RecordingHttpServer.PORT)
+                httpServer?.start()
+                Log.d(TAG, "Recording HTTP server started on :${RecordingHttpServer.PORT}")
+            }
+            val ip = getLocalIpAddress()
+            if (ip != null) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    sendCameraEvent(CommandChannel.evtRecordingServer(ip, RecordingHttpServer.PORT))
+                }, 500)
+            } else {
+                Log.w(TAG, "Could not determine local IP address")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "HTTP server start failed: ${e.message}")
+        }
+    }
+
+    private fun saveSnapshotToGallery(bitmap: Bitmap): String? {
+        return try {
+            val ts       = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val filename = "SecureCam_snap_$ts.jpg"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/SecureCam")
+                }
+                val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                uri?.let {
+                    contentResolver.openOutputStream(it)?.use { os ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, os)
+                    }
+                    it.toString()
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "SecureCam")
+                dir.mkdirs()
+                val file = File(dir, filename)
+                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+                file.absolutePath
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Snapshot save error: ${e.message}")
+            null
+        }
+    }
+
+    private fun getLocalIpAddress(): String? {
+        return try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val iface = interfaces.nextElement()
+                if (iface.isLoopback || !iface.isUp) continue
+                val addrs = iface.inetAddresses
+                while (addrs.hasMoreElements()) {
+                    val addr = addrs.nextElement()
+                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
+                        return addr.hostAddress
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) { null }
     }
 
     private fun sendCameraEvent(json: String) { webRTCManager?.sendCommand(json) }
@@ -297,6 +438,8 @@ class CameraActivity : AppCompatActivity(),
             }
             override fun onConnectionEstablished() {
                 runOnUiThread { isStreaming = true; updateStatus("🟢 Viewer Connected", true) }
+                // Start recording HTTP server and advertise IP to viewer
+                startRecordingHttpServer()
             }
             override fun onConnectionFailed() {
                 runOnUiThread { updateStatus("❌ Connection failed", false) }
@@ -327,10 +470,10 @@ class CameraActivity : AppCompatActivity(),
 
     private fun initWS() {
         wsStream = WebSocketStreamManager(serverUrl, roomCode, true, object : WebSocketStreamManager.StreamListener {
-            override fun onConnected()  { runOnUiThread { updateStatus("⏳ Waiting for viewer...", false) } }
+            override fun onConnected()    { runOnUiThread { updateStatus("⏳ Waiting for viewer...", false) } }
             override fun onDisconnected() { runOnUiThread { updateStatus("Disconnected", false) } }
-            override fun onPeerJoined() { runOnUiThread { isStreaming = true; updateStatus("🟢 Viewer Connected", true) } }
-            override fun onPeerLeft()   { runOnUiThread { isStreaming = false; updateStatus("⏳ Viewer disconnected", false) } }
+            override fun onPeerJoined()   { runOnUiThread { isStreaming = true; updateStatus("🟢 Viewer Connected", true) } }
+            override fun onPeerLeft()     { runOnUiThread { isStreaming = false; updateStatus("⏳ Viewer disconnected", false) } }
             override fun onFrameReceived(d: ByteArray) {}
             override fun onStreamInfo(w: Int, h: Int) {}
             override fun onMotionEventReceived(t: Long) {}
@@ -373,7 +516,6 @@ class CameraActivity : AppCompatActivity(),
         wsStream?.sendAiEvent(label, confidence)
         sendCameraEvent(CommandChannel.evtObject(label, confidence))
         logEvent("object", label, confidence, priority)
-        // Auto-record on critical/warning object detections
         if (priority in listOf("critical", "warning") && AppPreferences.autoRecordOnMotion) {
             recorder?.startRecording(AppPreferences.getRecordingDirectory())
         }
@@ -421,8 +563,8 @@ class CameraActivity : AppCompatActivity(),
 
     override fun onNightModeChanged(isNight: Boolean) {
         runOnUiThread {
-            binding.tvNightMode.visibility  = if (isNight) View.VISIBLE else View.GONE
-            binding.btnNightMode.alpha      = if (isNight) 1f else 0.5f
+            binding.tvNightMode.visibility = if (isNight) View.VISIBLE else View.GONE
+            binding.btnNightMode.alpha     = if (isNight) 1f else 0.5f
         }
     }
 
@@ -491,6 +633,7 @@ class CameraActivity : AppCompatActivity(),
         try { wsStream?.disconnect() } catch (_: Exception) {}
         try { exec?.shutdown() } catch (_: Exception) {}
         try { intruderMode?.release() } catch (_: Exception) {}
+        try { httpServer?.stop(); httpServer = null } catch (_: Exception) {}
         try { stopService(Intent(this, CameraStreamingService::class.java)) } catch (_: Exception) {}
     }
 }
