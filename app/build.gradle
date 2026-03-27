@@ -10,8 +10,8 @@ android {
         applicationId "com.securecam"
         minSdk 24
         targetSdk 34
-        versionCode 5
-        versionName "5.0.0"
+        versionCode 6
+        versionName "6.0.0"
         multiDexEnabled true
 
         kapt {
@@ -73,17 +73,18 @@ dependencies {
     implementation 'io.github.webrtc-sdk:android:104.5112.09'
     implementation 'com.google.mlkit:object-detection:17.0.1'
     implementation 'com.google.mlkit:face-detection:16.1.6'
-    // YOLO26n — CPU-only TFLite (GPU delegate has known INT64 incompatibility with YOLO26)
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'
     implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
     implementation 'org.tensorflow:tensorflow-lite-task-vision:0.4.4'
-    // ExoPlayer for in-app recording viewer
+    // ExoPlayer for local + HTTP recording streaming
     implementation 'androidx.media3:media3-exoplayer:1.2.1'
     implementation 'androidx.media3:media3-ui:1.2.1'
-    // Room — face embedding + event storage
+    // NanoHTTPD — camera phone serves recordings to viewer over WiFi
+    implementation 'fi.iki.elonen:nanohttpd:2.3.1'
+    // Room
     implementation 'androidx.room:room-runtime:2.6.1'
     implementation 'androidx.room:room-ktx:2.6.1'
     kapt 'androidx.room:room-compiler:2.6.1'
-    // QR code generation only (no external scanner lib needed)
+    // QR
     implementation 'com.google.zxing:core:3.5.3'
 }
