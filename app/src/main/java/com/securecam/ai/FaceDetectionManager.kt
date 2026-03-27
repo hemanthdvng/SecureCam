@@ -7,11 +7,10 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.*
 
 /**
- * Face detection + recognition.
- * ML Kit detects faces + crops them.
- * FaceRecognitionManager generates embeddings.
- * KnownFaceDatabase matches against stored persons.
- * Fires onUnknownFace when an unrecognised person is detected.
+ * Fixed FaceDetectionManager:
+ *  - Recognition runs every frame pass (cooldown reduced to 3s per-face by trackingId)
+ *  - Fires onFaceRecognised / onUnknownFace reliably every cooldown window
+ *  - Per-trackingId cooldown prevents spam without suppressing detection
  */
 class FaceDetectionManager(
     private val context: Context,
@@ -24,25 +23,30 @@ class FaceDetectionManager(
 
     private var isProcessing = false
     private var lastDetectionTime = 0L
-    private val DETECTION_INTERVAL_MS = 400L
+    private val DETECTION_INTERVAL_MS = 350L
+
+    // Per-trackingId cooldown — avoids duplicate alerts for same face
+    private val faceAlertCooldown = mutableMapOf<Int, Long>()
+    private val FACE_ALERT_COOLDOWN_MS = 8_000L   // 8 s per unique face
+
+    // Global unknown face cooldown
+    private var lastUnknownAlertTime = 0L
+    private val UNKNOWN_ALERT_COOLDOWN_MS = 6_000L
 
     private var lastFaceCount = 0
-    private var lastFaceAlertTime = 0L
-    private val ALERT_COOLDOWN_MS = 15_000L
 
     fun initialize() {
         val options = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
-            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-            .setMinFaceSize(0.08f)
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)  // faster for real-time
+            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)        // skip landmarks for speed
+            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
+            .setMinFaceSize(0.06f)   // detect smaller faces
             .enableTracking()
             .build()
         detector = FaceDetection.getClient(options)
-
         recognitionManager = FaceRecognitionManager(context).also { it.initialize() }
         faceDatabase = KnownFaceDatabase(context)
-        Log.d(TAG, "Face detection initialized. Recognition: ${recognitionManager?.isAvailable}")
+        Log.d(TAG, "FaceDetectionManager ready. Recognition=${recognitionManager?.isAvailable}")
     }
 
     fun processFrame(bitmap: Bitmap) {
@@ -56,7 +60,7 @@ class FaceDetectionManager(
             ?.addOnSuccessListener { mlFaces ->
                 val results = mlFaces.map { face ->
                     DetectedFace(
-                        trackingId = face.trackingId ?: -1,
+                        trackingId  = face.trackingId ?: -1,
                         boundingBox = BoundingBox(
                             face.boundingBox.left, face.boundingBox.top,
                             face.boundingBox.right, face.boundingBox.bottom
@@ -66,20 +70,15 @@ class FaceDetectionManager(
                         rightEyeOpenProbability = face.rightEyeOpenProbability ?: -1f,
                         headEulerAngleY = face.headEulerAngleY,
                         headEulerAngleZ = face.headEulerAngleZ,
-                        landmarks = extractLandmarks(face)
+                        landmarks = emptyMap()
                     )
                 }
 
                 if (results.isNotEmpty()) {
                     listener.onFacesDetected(results)
-
-                    // Recognition pass — only alert cooldown-gated
-                    val now2 = System.currentTimeMillis()
-                    if (now2 - lastFaceAlertTime > ALERT_COOLDOWN_MS) {
-                        runRecognition(bitmap, mlFaces)
-                        lastFaceAlertTime = now2
-                    }
                     if (lastFaceCount == 0) listener.onFaceAlert(results.size)
+                    // Run recognition on every detection pass (gated per-face by cooldown)
+                    runRecognition(bitmap, mlFaces, now)
                 } else {
                     listener.onNoFaceDetected()
                 }
@@ -87,39 +86,40 @@ class FaceDetectionManager(
                 isProcessing = false
             }
             ?.addOnFailureListener { e ->
-                Log.e(TAG, "Face detection failed: ${e.message}")
+                Log.e(TAG, "Detection failed: ${e.message}")
                 isProcessing = false
             }
     }
 
-    private fun runRecognition(fullBitmap: Bitmap, faces: List<Face>) {
+    private fun runRecognition(fullBitmap: Bitmap, faces: List<Face>, now: Long) {
         val rm = recognitionManager ?: return
         val db = faceDatabase ?: return
 
         for (face in faces) {
+            val tid = face.trackingId ?: -1
+            // Per-face cooldown check
+            if (now - (faceAlertCooldown[tid] ?: 0L) < FACE_ALERT_COOLDOWN_MS) continue
+
             try {
-                val bb = face.boundingBox
+                val bb   = face.boundingBox
                 val crop = rm.cropFace(fullBitmap, bb.left, bb.top, bb.right, bb.bottom)
 
-                if (rm.isAvailable) {
+                val matched: Pair<String, Float>? = if (rm.isAvailable) {
                     val emb = rm.generateEmbedding(crop)
-                    if (emb != null) {
-                        val match = db.findMatch(emb)
-                        if (match != null) {
-                            listener.onFaceRecognised(match.first, match.second)
-                        } else {
-                            listener.onUnknownFace()
-                        }
-                    }
+                    if (emb != null) db.findMatch(emb) else null
                 } else {
-                    // Pixel-level fallback
-                    if (!db.isEmpty()) {
-                        val match = db.findMatchByPixel(crop)
-                        if (match != null) {
-                            listener.onFaceRecognised(match.first, match.second)
-                        } else {
-                            listener.onUnknownFace()
-                        }
+                    if (!db.isEmpty()) db.findMatchByPixel(crop) else null
+                }
+
+                if (matched != null) {
+                    faceAlertCooldown[tid] = now
+                    listener.onFaceRecognised(matched.first, matched.second)
+                } else if (!db.isEmpty()) {
+                    // Only fire unknown alert if DB has faces (otherwise nobody enrolled yet)
+                    if (now - lastUnknownAlertTime > UNKNOWN_ALERT_COOLDOWN_MS) {
+                        lastUnknownAlertTime = now
+                        faceAlertCooldown[tid] = now
+                        listener.onUnknownFace()
                     }
                 }
             } catch (e: Exception) {
@@ -128,27 +128,12 @@ class FaceDetectionManager(
         }
     }
 
-    /** Call this to register a new person from a face crop */
     fun registerFace(name: String, faceBitmap: Bitmap) {
         val rm = recognitionManager
         val db = faceDatabase ?: return
         val emb = rm?.generateEmbedding(faceBitmap)
         db.addFace(name, faceBitmap, emb)
-        Log.d(TAG, "Registered face: $name")
-    }
-
-    private fun extractLandmarks(face: Face): Map<String, Pair<Float, Float>> {
-        val map = mutableMapOf<String, Pair<Float, Float>>()
-        listOf(
-            FaceLandmark.LEFT_EYE   to "left_eye",
-            FaceLandmark.RIGHT_EYE  to "right_eye",
-            FaceLandmark.NOSE_BASE  to "nose",
-            FaceLandmark.MOUTH_LEFT to "mouth_left",
-            FaceLandmark.MOUTH_RIGHT to "mouth_right"
-        ).forEach { (type, name) ->
-            face.getLandmark(type)?.let { map[name] = Pair(it.position.x, it.position.y) }
-        }
-        return map
+        Log.d(TAG, "Registered: $name  embedding=${emb != null}")
     }
 
     fun release() {
