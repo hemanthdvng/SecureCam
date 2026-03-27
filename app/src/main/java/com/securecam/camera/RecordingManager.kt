@@ -1,11 +1,9 @@
 package com.securecam.camera
 
-import android.content.ContentValues
 import android.content.Context
 import android.media.MediaActionSound
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.camera.core.AspectRatio
 import androidx.camera.video.*
@@ -17,131 +15,148 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * Manages automatic + manual recording using CameraX VideoCapture.
- * Triggered by motion score crossing a threshold.
- * Saves to user-chosen directory (Movies/SecureCam by default).
+ * Smart recording manager:
+ *  • Starts when motion score crosses threshold
+ *  • Stops automatically when:
+ *      a) Motion falls below threshold for MOTION_GRACE_MS (10 s default, max 15 s)
+ *      b) MAX_DURATION_MS (15 s) hard cap reached
+ *  • Uses SD quality for minimum storage footprint
+ *  • Accessible from ViewerActivity via the recordings directory
  */
 class RecordingManager(
     private val context: Context,
     private val listener: RecordingListener
 ) {
     private val TAG = "RecordingManager"
-    private val recordingExecutor = Executors.newSingleThreadExecutor()
+    private val executor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
     private var isRecording = false
 
-    // Auto-recording logic
-    private var motionStopTime = 0L
-    private val MOTION_STOP_DELAY_MS = 10_000L  // stop 10s after motion ends
-    private val AUTO_MOTION_THRESHOLD = 0.35f
+    // ── Motion-driven stop thresholds ────────────────────────────────────────
+    private val AUTO_MOTION_THRESHOLD  = 0.35f
+    private val MOTION_GRACE_MS        = 10_000L  // stop 10 s after motion ceases
+    private val MAX_DURATION_MS        = 15_000L  // hard cap per clip
 
-    // Sound for shutter feedback
+    private var motionStopTime  = 0L
+    private var recordingStartTime = 0L
+    private var maxDurationRunnable: Runnable? = null
+
     private val shutterSound by lazy { MediaActionSound() }
 
-    /**
-     * Called once from CameraActivity after camera is bound.
-     * Returns the VideoCapture use case to bind alongside Preview + Analysis.
-     */
+    // ─────────────────────────────────────────────────────────────────────────
     fun buildVideoCapture(): VideoCapture<Recorder> {
         val recorder = Recorder.Builder()
+            // SD quality → ~15-40 MB/min (vs ~150 MB/min for FHD)
+            // Falls back to lowest available if SD not supported
             .setQualitySelector(
                 QualitySelector.fromOrderedList(
-                    listOf(Quality.FHD, Quality.HD, Quality.SD),
+                    listOf(Quality.SD, Quality.HD),
                     FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)
                 )
             )
-            .setExecutor(recordingExecutor)
+            .setExecutor(executor)
             .build()
-        val vc = VideoCapture.withOutput(recorder)
-        videoCapture = vc
-        return vc
+        return VideoCapture.withOutput(recorder).also { videoCapture = it }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
     fun startRecording(outputDir: File) {
         if (isRecording) return
         val vc = videoCapture ?: run {
-            Log.w(TAG, "VideoCapture not ready")
-            listener.onRecordingError("Recording not available")
+            listener.onRecordingError("VideoCapture not ready")
             return
         }
 
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val fileName = "SecureCam_$timestamp.mp4"
+        val ts   = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val file = File(outputDir.also { it.mkdirs() }, "SecureCam_$ts.mp4")
 
         try {
-            outputDir.mkdirs()
-            val outputFile = File(outputDir, fileName)
-
-            val fileOutputOptions = FileOutputOptions.Builder(outputFile).build()
-
             activeRecording = vc.output
-                .prepareRecording(context, fileOutputOptions)
+                .prepareRecording(context, FileOutputOptions.Builder(file).build())
                 .apply { withAudioEnabled() }
                 .start(ContextCompat.getMainExecutor(context)) { event ->
                     when (event) {
                         is VideoRecordEvent.Start -> {
                             isRecording = true
+                            recordingStartTime = System.currentTimeMillis()
                             shutterSound.play(MediaActionSound.START_VIDEO_RECORDING)
-                            listener.onRecordingStarted(outputFile.absolutePath)
-                            Log.d(TAG, "Recording started: $fileName")
+                            listener.onRecordingStarted(file.absolutePath)
+                            Log.d(TAG, "Recording started → $file")
+                            // Hard cap: stop after MAX_DURATION_MS regardless of motion
+                            scheduleMaxDurationStop()
                         }
                         is VideoRecordEvent.Finalize -> {
                             isRecording = false
+                            motionStopTime = 0L
+                            cancelMaxDurationStop()
                             shutterSound.play(MediaActionSound.STOP_VIDEO_RECORDING)
                             if (event.hasError()) {
                                 Log.e(TAG, "Recording error: ${event.error}")
-                                listener.onRecordingError("Error code ${event.error}")
+                                listener.onRecordingError("Error ${event.error}")
                             } else {
-                                val size = event.outputResults.outputUri.toString()
-                                Log.d(TAG, "Recording saved: $fileName")
-                                listener.onRecordingStopped(outputFile.absolutePath)
+                                Log.d(TAG, "Saved: ${file.name}  ${file.length()/1024} KB")
+                                listener.onRecordingStopped(file.absolutePath)
                             }
                         }
                         else -> {}
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start recording: ${e.message}")
+            Log.e(TAG, "Start failed: ${e.message}")
             listener.onRecordingError(e.message ?: "Unknown error")
         }
     }
 
     fun stopRecording() {
         if (!isRecording) return
-        try {
-            activeRecording?.stop()
-            activeRecording = null
-        } catch (e: Exception) {
-            Log.e(TAG, "Stop recording error: ${e.message}")
-            isRecording = false
-        }
+        cancelMaxDurationStop()
+        try { activeRecording?.stop(); activeRecording = null }
+        catch (e: Exception) { isRecording = false }
     }
 
-    /** Call this from motion callback for auto-recording */
+    // ── Called on every motion score update from CameraActivity ──────────────
     fun onMotionScore(score: Float, outputDir: File, autoEnabled: Boolean) {
         if (!autoEnabled) return
         val hasMotion = score > AUTO_MOTION_THRESHOLD
+
         if (hasMotion) {
             motionStopTime = 0L
             if (!isRecording) startRecording(outputDir)
         } else if (isRecording) {
             if (motionStopTime == 0L) {
                 motionStopTime = System.currentTimeMillis()
-            } else if (System.currentTimeMillis() - motionStopTime > MOTION_STOP_DELAY_MS) {
-                stopRecording()
-                motionStopTime = 0L
+            } else {
+                val elapsed = System.currentTimeMillis() - motionStopTime
+                if (elapsed >= MOTION_GRACE_MS) stopRecording()
             }
         }
+    }
+
+    // ── Hard duration cap ─────────────────────────────────────────────────────
+    private fun scheduleMaxDurationStop() {
+        val r = Runnable {
+            Log.d(TAG, "Max duration (${MAX_DURATION_MS}ms) reached — stopping")
+            stopRecording()
+        }
+        maxDurationRunnable = r
+        mainHandler.postDelayed(r, MAX_DURATION_MS)
+    }
+
+    private fun cancelMaxDurationStop() {
+        maxDurationRunnable?.let { mainHandler.removeCallbacks(it) }
+        maxDurationRunnable = null
     }
 
     fun isRecording() = isRecording
 
     fun release() {
         stopRecording()
+        cancelMaxDurationStop()
         shutterSound.release()
-        recordingExecutor.shutdown()
+        executor.shutdown()
     }
 
     interface RecordingListener {
