@@ -72,7 +72,6 @@ object AppPreferences {
         get() = prefs.getBoolean("auto_record_motion", false)
         set(value) = prefs.edit().putBoolean("auto_record_motion", value).apply()
 
-    // ── New prefs for v5 ──────────────────────────────────────────────────────
     var alarmOnIntruderEnabled: Boolean
         get() = prefs.getBoolean("alarm_on_intruder", true)
         set(value) = prefs.edit().putBoolean("alarm_on_intruder", value).apply()
@@ -112,6 +111,15 @@ object AppPreferences {
     var eventRetentionDays: Int
         get() = prefs.getInt("event_retention_days", 7)
         set(value) = prefs.edit().putInt("event_retention_days", value).apply()
+
+    /**
+     * Face recognition model type:
+     * 0 = MobileFaceNet (128-dim, included in assets/, faster)
+     * 1 = ArcFace MobileNet (512-dim, must download or add to assets/, more accurate)
+     */
+    var faceModelType: Int
+        get() = prefs.getInt("face_model_type", 0)
+        set(value) = prefs.edit().putInt("face_model_type", value).apply()
 
     fun getRecordingDirectory(): File {
         return when (recordingSaveLocation) {
