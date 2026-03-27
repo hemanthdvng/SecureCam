@@ -2,50 +2,56 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
     android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@color/colorCard"
     android:padding="14dp"
-    android:gravity="center_vertical">
+    android:layout_marginBottom="1dp">
 
+    <!-- Play icon -->
     <TextView
         android:layout_width="40dp"
         android:layout_height="40dp"
+        android:text="▶"
+        android:textColor="#0A84FF"
+        android:textSize="18sp"
         android:gravity="center"
-        android:text="🎬"
-        android:textSize="24sp" />
+        android:background="@drawable/btn_circle_bg"/>
 
+    <!-- File info -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginStart="12dp"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:layout_marginStart="12dp">
 
         <TextView
             android:id="@+id/tvRecFileName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="@color/colorTextPrimary"
+            android:textColor="#FFFFFF"
             android:textSize="14sp"
-            android:textStyle="bold"
-            android:ellipsize="middle"
-            android:singleLine="true" />
+            android:fontFamily="sans-serif-medium"
+            android:singleLine="true"
+            android:ellipsize="middle"/>
 
         <TextView
             android:id="@+id/tvRecMeta"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textColor="@color/colorTextSecondary"
-            android:textSize="12sp" />
+            android:textColor="#EBEBF599"
+            android:textSize="12sp"/>
     </LinearLayout>
 
+    <!-- Chevron -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:text="▶"
-        android:textColor="@color/colorAccent"
-        android:textSize="18sp" />
+        android:text="›"
+        android:textColor="#EBEBF54D"
+        android:textSize="22sp"
+        android:layout_marginStart="8dp"/>
 
 </LinearLayout>
