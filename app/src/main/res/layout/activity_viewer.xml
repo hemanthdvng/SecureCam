@@ -1,311 +1,389 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/black">
+    android:background="#000000">
 
-    <!-- WebRTC Remote Video -->
-    <org.webrtc.SurfaceViewRenderer
-        android:id="@+id/remoteVideoView"
+    <!-- ── LIVE PANEL ─────────────────────────────────────────────────── -->
+    <FrameLayout
+        android:id="@+id/livePanel"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone" />
+        android:layout_height="match_parent">
 
-    <!-- WebSocket Relay View -->
-    <ImageView
-        android:id="@+id/wsFrameView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="fitCenter"
-        android:visibility="gone"
-        android:contentDescription="Live frame" />
+        <!-- WebRTC video -->
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/remoteVideoView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"/>
 
-    <!-- Waiting Screen -->
+        <!-- WebSocket relay view -->
+        <ImageView
+            android:id="@+id/wsFrameView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:visibility="gone"
+            android:contentDescription="Live frame"/>
+
+        <!-- Waiting screen -->
+        <LinearLayout
+            android:id="@+id/tvWaiting"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="📡" android:textSize="56sp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" android:text="Waiting for camera…"
+                android:textColor="#EBEBF599" android:textSize="17sp"
+                android:fontFamily="sans-serif-medium"/>
+            <ProgressBar android:layout_width="32dp" android:layout_height="32dp"
+                android:layout_marginTop="20dp"
+                android:indeterminateTint="#0A84FF"/>
+        </LinearLayout>
+
+        <!-- 🔴 REC badge -->
+        <TextView
+            android:id="@+id/tvRecordingIndicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="60dp"
+            android:layout_marginEnd="16dp"
+            android:text=" ⏺ REC "
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:background="#CCFF453A"
+            android:paddingVertical="4dp"
+            android:paddingHorizontal="8dp"
+            android:visibility="gone"/>
+
+        <!-- Night mode pill -->
+        <TextView
+            android:id="@+id/tvNightModeLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_marginTop="60dp"
+            android:layout_marginStart="16dp"
+            android:text=" 🌙 Night "
+            android:textColor="#BF5AF2"
+            android:textSize="11sp"
+            android:background="#33BF5AF2"
+            android:paddingVertical="4dp"
+            android:paddingHorizontal="8dp"
+            android:visibility="gone"/>
+
+        <!-- Motion alert toast -->
+        <TextView
+            android:id="@+id/tvMotionAlert"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="110dp"
+            android:text="⚠️ Motion Detected!"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:background="#CCFF453A"
+            android:paddingVertical="8dp"
+            android:paddingHorizontal="18dp"
+            android:visibility="gone"/>
+
+        <!-- AI event toast -->
+        <TextView
+            android:id="@+id/tvAiAlert"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="154dp"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:background="#CC1C1C1E"
+            android:paddingVertical="8dp"
+            android:paddingHorizontal="18dp"
+            android:visibility="gone"/>
+
+        <!-- Resolution badge -->
+        <TextView
+            android:id="@+id/tvResolution"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_marginBottom="100dp"
+            android:layout_marginStart="16dp"
+            android:textColor="#EBEBF599"
+            android:textSize="11sp"
+            android:visibility="gone"/>
+
+        <!-- Controls overlay (tap to show/hide) -->
+        <LinearLayout
+            android:id="@+id/controlsOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:background="#B3000000"
+            android:paddingBottom="16dp">
+
+            <!-- Status bar row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp">
+
+                <View
+                    android:id="@+id/statusDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:background="@android:drawable/presence_busy"
+                    android:layout_marginEnd="8dp"/>
+                <TextView
+                    android:id="@+id/tvStatus"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Connecting…"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium"/>
+                <TextView
+                    android:id="@+id/tvConnectionType"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#0A84FF"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:background="#1A0A84FF"
+                    android:paddingVertical="3dp"
+                    android:paddingHorizontal="8dp"/>
+                <TextView
+                    android:id="@+id/tvRoomCode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="#EBEBF599"
+                    android:textSize="11sp"/>
+            </LinearLayout>
+
+            <!-- Zoom row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp">
+                <TextView
+                    android:layout_width="36dp"
+                    android:layout_height="wrap_content"
+                    android:text="🔍"
+                    android:textSize="14sp"/>
+                <SeekBar
+                    android:id="@+id/seekZoom"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:progressTint="#0A84FF"
+                    android:thumbTint="#FFFFFF"/>
+                <TextView
+                    android:id="@+id/tvZoomLabel"
+                    android:layout_width="40dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="1.0×"
+                    android:textColor="#EBEBF599"
+                    android:textSize="12sp"
+                    android:gravity="end"/>
+            </LinearLayout>
+
+            <!-- Control buttons row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingHorizontal="8dp"
+                android:paddingTop="8dp">
+
+                <!-- Night mode -->
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <ImageButton android:id="@+id/btnNightMode"
+                        android:layout_width="44dp" android:layout_height="44dp"
+                        android:background="@drawable/btn_circle_bg"
+                        android:src="@android:drawable/ic_menu_view"
+                        android:alpha="0.5"
+                        android:contentDescription="Night mode"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Night" android:textColor="#EBEBF599" android:textSize="10sp"
+                        android:layout_marginTop="4dp"/>
+                </LinearLayout>
+
+                <!-- Torch -->
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <ImageButton android:id="@+id/btnTorch"
+                        android:layout_width="44dp" android:layout_height="44dp"
+                        android:background="@drawable/btn_circle_bg"
+                        android:src="@android:drawable/ic_menu_compass"
+                        android:alpha="0.5"
+                        android:contentDescription="Torch"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Torch" android:textColor="#EBEBF599" android:textSize="10sp"
+                        android:layout_marginTop="4dp"/>
+                </LinearLayout>
+
+                <!-- PTT -->
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <ImageButton android:id="@+id/btnPtt"
+                        android:layout_width="56dp" android:layout_height="56dp"
+                        android:background="@drawable/btn_circle_bg"
+                        android:src="@android:drawable/ic_btn_speak_now"
+                        android:alpha="0.55"
+                        android:contentDescription="Push to talk"/>
+                    <TextView android:id="@+id/tvPttLabel"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Hold to Talk" android:textColor="#EBEBF599" android:textSize="10sp"
+                        android:layout_marginTop="4dp" android:visibility="gone"/>
+                </LinearLayout>
+
+                <!-- Switch camera -->
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <ImageButton android:id="@+id/btnSwitchCamera"
+                        android:layout_width="44dp" android:layout_height="44dp"
+                        android:background="@drawable/btn_circle_bg"
+                        android:src="@android:drawable/ic_menu_rotate"
+                        android:contentDescription="Switch camera"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Flip" android:textColor="#EBEBF599" android:textSize="10sp"
+                        android:layout_marginTop="4dp"/>
+                </LinearLayout>
+
+                <!-- Fullscreen -->
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <ImageButton android:id="@+id/btnFullscreen"
+                        android:layout_width="44dp" android:layout_height="44dp"
+                        android:background="@drawable/btn_circle_bg"
+                        android:src="@android:drawable/ic_menu_zoom"
+                        android:contentDescription="Fullscreen"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Full" android:textColor="#EBEBF599" android:textSize="10sp"
+                        android:layout_marginTop="4dp"/>
+                </LinearLayout>
+
+                <!-- Disconnect -->
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <ImageButton android:id="@+id/btnDisconnect"
+                        android:layout_width="44dp" android:layout_height="44dp"
+                        android:background="#3CFF453A"
+                        android:src="@android:drawable/ic_menu_close_clear_cancel"
+                        android:contentDescription="Disconnect"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Close" android:textColor="#FF453A" android:textSize="10sp"
+                        android:layout_marginTop="4dp"/>
+                </LinearLayout>
+
+            </LinearLayout>
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- ── RECORDINGS PANEL ───────────────────────────────────────────── -->
     <LinearLayout
-        android:id="@+id/tvWaiting"
+        android:id="@+id/recordingsPanel"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:gravity="center">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="📡" android:textSize="60sp" />
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginTop="16dp" android:text="Waiting for camera…"
-            android:textColor="@color/colorTextSecondary" android:textSize="16sp" />
-        <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginTop="20dp" android:indeterminateTint="@color/colorAccent" />
-    </LinearLayout>
+        android:background="#000000"
+        android:visibility="gone">
 
-    <!-- Recording Indicator (top-right) -->
-    <TextView
-        android:id="@+id/tvRecordingIndicator"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="56dp"
-        android:layout_marginEnd="12dp"
-        android:text="🔴 REC"
-        android:textColor="@color/white"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        android:background="#CCff0000"
-        android:padding="4dp"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:visibility="gone" />
-
-    <!-- Night mode label (top-left) -->
-    <TextView
-        android:id="@+id/tvNightModeLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|start"
-        android:layout_marginTop="56dp"
-        android:layout_marginStart="12dp"
-        android:text="🌙 Night"
-        android:textColor="@color/white"
-        android:textSize="12sp"
-        android:background="#BB6E40C9"
-        android:padding="4dp"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:visibility="gone" />
-
-    <!-- PTT speaking label -->
-    <TextView
-        android:id="@+id/tvPttLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="56dp"
-        android:text="🔴 Speaking"
-        android:textColor="@color/white"
-        android:textSize="13sp"
-        android:textStyle="bold"
-        android:background="#CCff3b3b"
-        android:padding="6dp"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:visibility="gone" />
-
-    <!-- Controls Overlay -->
-    <LinearLayout
-        android:id="@+id/controlsOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
-
-        <!-- Top HUD -->
-        <LinearLayout
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="12dp"
-            android:background="@color/overlay_dark"
-            android:gravity="center_vertical">
+            android:text="Saved Recordings"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="8dp"/>
 
-            <View
-                android:id="@+id/statusDot"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:background="@android:drawable/presence_busy"
-                android:layout_marginEnd="8dp" />
-
-            <TextView
-                android:id="@+id/tvStatus"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Connecting…"
-                android:textColor="@color/colorTextPrimary"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/tvConnectionType"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="WEBRTC"
-                android:textColor="@color/colorAccent"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:background="@color/colorCard"
-                android:padding="4dp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp" />
-
-            <TextView
-                android:id="@+id/tvRoomCode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="Room: ——"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- Spacer -->
-        <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
-
-        <!-- AI Alerts area -->
-        <LinearLayout
+        <TextView
+            android:id="@+id/tvNoRecordings"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="12dp">
-
-            <TextView
-                android:id="@+id/tvMotionAlert"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="⚠️ Motion!"
-                android:textColor="@color/white"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:background="#CCFF3B3B"
-                android:padding="8dp"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvAiAlert"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="🤖"
-                android:textColor="@color/white"
-                android:textSize="13sp"
-                android:background="#BB00FF88"
-                android:padding="6dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvResolution"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text=""
-                android:textColor="@color/colorTextHint"
-                android:textSize="11sp"
-                android:visibility="gone" />
-        </LinearLayout>
-
-        <!-- Zoom bar -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="4dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🔍"
-                android:textSize="16sp"
-                android:layout_marginEnd="8dp" />
-
-            <SeekBar
-                android:id="@+id/seekZoom"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:progressTint="@color/colorAccent"
-                android:thumbTint="@color/white" />
-
-            <TextView
-                android:id="@+id/tvZoomLabel"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="1.0×"
-                android:textColor="@color/white"
-                android:textSize="12sp"
-                android:gravity="end" />
-        </LinearLayout>
-
-        <!-- Bottom Controls -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:gravity="center"
-            android:background="@color/overlay_dark"
-            android:padding="10dp">
+            android:text="📭\n\nNo recordings yet.\nRecordings save automatically\nwhen motion or an unknown face\nis detected."
+            android:textColor="#EBEBF599"
+            android:textSize="15sp"
+            android:lineSpacingMultiplier="1.5"
+            android:visibility="gone"/>
 
-            <!-- Switch Camera -->
-            <ImageButton
-                android:id="@+id/btnSwitchCamera"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:layout_marginEnd="8dp"
-                android:src="@android:drawable/ic_menu_rotate"
-                android:tint="@color/white"
-                android:background="@color/colorCard"
-                android:contentDescription="Switch Camera" />
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvRecordings"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"/>
 
-            <!-- Night Mode -->
-            <ImageButton
-                android:id="@+id/btnNightMode"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:layout_marginEnd="8dp"
-                android:alpha="0.5"
-                android:src="@android:drawable/ic_menu_today"
-                android:tint="#AA88FF"
-                android:background="@color/colorCard"
-                android:contentDescription="Night Mode" />
-
-            <!-- Torch -->
-            <ImageButton
-                android:id="@+id/btnTorch"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:layout_marginEnd="8dp"
-                android:alpha="0.5"
-                android:src="@android:drawable/star_big_on"
-                android:tint="#FFAA00"
-                android:background="@color/colorCard"
-                android:contentDescription="Torch" />
-
-            <!-- PTT (Push to Talk) -->
-            <Button
-                android:id="@+id/btnPtt"
-                android:layout_width="wrap_content"
-                android:layout_height="44dp"
-                android:layout_marginEnd="8dp"
-                android:alpha="0.55"
-                android:text="🎤 PTT"
-                android:textColor="@color/white"
-                android:textSize="12sp"
-                android:backgroundTint="#FF005500"
-                style="@style/Widget.MaterialComponents.Button" />
-
-            <!-- Fullscreen -->
-            <ImageButton
-                android:id="@+id/btnFullscreen"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:layout_marginEnd="8dp"
-                android:src="@android:drawable/ic_menu_zoom"
-                android:tint="@color/white"
-                android:background="@color/colorCard"
-                android:contentDescription="Fullscreen" />
-
-            <!-- Disconnect -->
-            <Button
-                android:id="@+id/btnDisconnect"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="END"
-                android:textColor="@color/white"
-                android:backgroundTint="@color/colorAccentRed"
-                style="@style/Widget.MaterialComponents.Button" />
-        </LinearLayout>
     </LinearLayout>
 
-</FrameLayout>
+    <!-- ── BOTTOM TAB BAR (iOS style) ─────────────────────────────────── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="82dp"
+        android:layout_gravity="bottom"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:background="#F0000000"
+        android:paddingBottom="16dp">
+
+        <!-- Live tab -->
+        <LinearLayout
+            android:id="@+id/btnTabLive"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="📹" android:textSize="22sp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Live" android:textColor="#FFFFFF" android:textSize="10sp"
+                android:layout_marginTop="2dp"/>
+        </LinearLayout>
+
+        <!-- Recordings tab -->
+        <LinearLayout
+            android:id="@+id/btnTabRecordings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:alpha="0.45">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🎞️" android:textSize="22sp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Recordings" android:textColor="#FFFFFF" android:textSize="10sp"
+                android:layout_marginTop="2dp"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
