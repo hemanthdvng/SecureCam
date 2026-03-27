@@ -79,8 +79,8 @@ dependencies {
     // ExoPlayer for local + HTTP recording streaming
     implementation 'androidx.media3:media3-exoplayer:1.2.1'
     implementation 'androidx.media3:media3-ui:1.2.1'
-    // NanoHTTPD — camera phone serves recordings to viewer over WiFi
-    implementation 'fi.iki.elonen:nanohttpd:2.3.1'
+    // NanoHTTPD — via JitPack (fi.iki.elonen no longer on Maven Central)
+    implementation 'com.github.NanoHttpd.nanohttpd:nanohttpd:nanohttpd-project-2.3.1'
     // Room
     implementation 'androidx.room:room-runtime:2.6.1'
     implementation 'androidx.room:room-ktx:2.6.1'
