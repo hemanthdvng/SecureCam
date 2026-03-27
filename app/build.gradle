@@ -73,13 +73,10 @@ dependencies {
     implementation 'io.github.webrtc-sdk:android:104.5112.09'
     implementation 'com.google.mlkit:object-detection:17.0.1'
     implementation 'com.google.mlkit:face-detection:16.1.6'
+    // YOLO26n — CPU-only TFLite (GPU delegate has known INT64 incompatibility with YOLO26)
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'
     implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
     implementation 'org.tensorflow:tensorflow-lite-task-vision:0.4.4'
-    // YOLOv10-N GPU acceleration
-    implementation 'org.tensorflow:tensorflow-lite-gpu:2.14.0'
-    implementation 'org.tensorflow:tensorflow-lite-gpu-api:2.14.0'
-    implementation 'org.tensorflow:tensorflow-lite-gpu-delegate-plugin:0.4.4'
     // ExoPlayer for in-app recording viewer
     implementation 'androidx.media3:media3-exoplayer:1.2.1'
     implementation 'androidx.media3:media3-ui:1.2.1'
