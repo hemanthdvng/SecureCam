@@ -1,5 +1,7 @@
 package com.securecam.ui
 
+import android.app.Activity
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
@@ -10,8 +12,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.WriterException
 import com.google.zxing.qrcode.QRCodeWriter
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import com.securecam.databinding.ActivityQrBinding
 import com.securecam.utils.AppPreferences
 
@@ -19,8 +19,19 @@ class QRActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityQrBinding
 
-    private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
-        if (result.contents != null) parseScanResult(result.contents)
+    // Use any installed barcode scanner app via generic Intent
+    private val scanLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            // ZXing-compatible barcode scanner apps return result in SCAN_RESULT extra
+            val scanned = data?.getStringExtra("SCAN_RESULT")
+                ?: data?.getStringExtra("result")
+                ?: data?.data?.toString()
+            if (!scanned.isNullOrEmpty()) parseScanResult(scanned)
+            else Toast.makeText(this, "No QR data received", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,16 +51,7 @@ class QRActivity : AppCompatActivity() {
             binding.tvRoomInfo.text = "Start a Camera session first to generate a QR code."
         }
 
-        binding.btnScanQR.setOnClickListener {
-            val opts = ScanOptions().apply {
-                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                setPrompt("Scan camera phone's QR code")
-                setCameraId(0)
-                setBeepEnabled(true)
-                setBarcodeImageEnabled(false)
-            }
-            scanLauncher.launch(opts)
-        }
+        binding.btnScanQR.setOnClickListener { launchScanner() }
     }
 
     private fun generateQR(roomCode: String, serverUrl: String) {
@@ -66,20 +68,39 @@ class QRActivity : AppCompatActivity() {
         }
     }
 
+    private fun launchScanner() {
+        // Try ZXing barcode scanner app (most common), fallback message if not installed
+        val intent = Intent("com.google.zxing.client.android.SCAN").apply {
+            putExtra("SCAN_MODE", "QR_CODE_MODE")
+        }
+        try {
+            scanLauncher.launch(intent)
+        } catch (e: Exception) {
+            // No ZXing app installed — prompt user to manually enter room code
+            Toast.makeText(
+                this,
+                "Install 'Barcode Scanner' app from Play Store to scan QR codes, or enter room code manually in the main screen.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     private fun parseScanResult(content: String) {
         if (content.startsWith("securecam://join")) {
-            val uri = Uri.parse(content)
+            val uri    = Uri.parse(content)
             val room   = uri.getQueryParameter("room")   ?: ""
             val server = uri.getQueryParameter("server") ?: ""
             if (room.isNotEmpty()) {
                 AppPreferences.lastRoomCode = room
                 if (server.isNotEmpty() && server != "none")
                     AppPreferences.customSignalingServer = server
-                Toast.makeText(this, "✅ Room loaded: $room — tap Connect in main menu", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "✅ Room loaded: $room — go back and tap Connect", Toast.LENGTH_LONG).show()
                 finish()
+            } else {
+                Toast.makeText(this, "QR code missing room code", Toast.LENGTH_SHORT).show()
             }
         } else {
-            Toast.makeText(this, "Invalid QR code", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Invalid SecureCam QR code", Toast.LENGTH_SHORT).show()
         }
     }
 
