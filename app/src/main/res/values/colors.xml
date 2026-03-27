@@ -1,23 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#0D1117</color>
-    <color name="colorPrimaryDark">#010409</color>
-    <color name="colorAccent">#00D4FF</color>
-    <color name="colorAccentGreen">#00FF88</color>
-    <color name="colorAccentRed">#FF3B3B</color>
-    <color name="colorAccentOrange">#FF9500</color>
-    <color name="colorSurface">#161B22</color>
-    <color name="colorCard">#21262D</color>
-    <color name="colorBorder">#30363D</color>
-    <color name="colorTextPrimary">#F0F6FC</color>
-    <color name="colorTextSecondary">#8B949E</color>
-    <color name="colorTextHint">#484F58</color>
+    <!-- Apple-style system palette -->
+    <color name="colorPrimary">#000000</color>
+    <color name="colorPrimaryDark">#000000</color>
+    <color name="colorAccent">#0A84FF</color>       <!-- iOS Blue -->
+    <color name="colorAccentGreen">#30D158</color>  <!-- iOS Green -->
+    <color name="colorAccentRed">#FF453A</color>    <!-- iOS Red -->
+    <color name="colorAccentOrange">#FF9F0A</color> <!-- iOS Orange -->
+    <color name="colorAccentYellow">#FFD60A</color> <!-- iOS Yellow -->
+    <color name="colorSurface">#1C1C1E</color>      <!-- iOS grouped bg -->
+    <color name="colorCard">#2C2C2E</color>         <!-- iOS secondary grouped -->
+    <color name="colorCard2">#3A3A3C</color>        <!-- iOS tertiary -->
+    <color name="colorBorder">#38383A</color>       <!-- iOS separator -->
+    <color name="colorTextPrimary">#FFFFFF</color>
+    <color name="colorTextSecondary">#EBEBF599</color>  <!-- iOS secondary label -->
+    <color name="colorTextHint">#EBEBF54D</color>       <!-- iOS tertiary label -->
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
     <color name="transparent">#00000000</color>
-    <color name="overlay_dark">#CC000000</color>
-    <color name="motion_color">#FF3B3B</color>
-    <color name="face_color">#00D4FF</color>
-    <color name="object_color">#00FF88</color>
-    <color name="night_color">#6E40C9</color>
+    <color name="overlay_dark">#B3000000</color>
+    <color name="motion_color">#FF453A</color>
+    <color name="face_color">#0A84FF</color>
+    <color name="object_color">#30D158</color>
+    <color name="night_color">#BF5AF2</color>       <!-- iOS Purple -->
+    <color name="tab_selected">#FFFFFF</color>
+    <color name="tab_unselected">#EBEBF54D</color>
 </resources>
