@@ -362,18 +362,21 @@ class CameraActivity : AppCompatActivity(),
         runOnUiThread {
             if (objects.isEmpty()) binding.tvObjectLabel.visibility = View.GONE
             else {
-                binding.tvObjectLabel.text = objects.joinToString { it.topLabel.text }
+                binding.tvObjectLabel.text = objects.take(3).joinToString { "${it.label}(${(it.confidence*100).toInt()}%)" }
                 binding.tvObjectLabel.visibility = View.VISIBLE
             }
         }
     }
 
-    override fun onObjectAlert(label: String, confidence: Float) {
-        try { NotificationHelper.showObjectDetectionAlert(this, label, confidence) } catch (_: Exception) {}
+    override fun onObjectAlert(label: String, group: String, confidence: Float, priority: String, reappeared: Boolean) {
+        try { NotificationHelper.showObjectDetectionAlert(this, label, group, confidence, priority, reappeared) } catch (_: Exception) {}
         wsStream?.sendAiEvent(label, confidence)
         sendCameraEvent(CommandChannel.evtObject(label, confidence))
-        val priority = if (label.lowercase().contains("person")) "warning" else "normal"
         logEvent("object", label, confidence, priority)
+        // Auto-record on critical/warning object detections
+        if (priority in listOf("critical", "warning") && AppPreferences.autoRecordOnMotion) {
+            recorder?.startRecording(AppPreferences.getRecordingDirectory())
+        }
     }
 
     override fun onFacesUpdate(faces: List<FaceDetectionManager.DetectedFace>) {
