@@ -399,6 +399,7 @@ class CameraActivity : AppCompatActivity(),
                 binding.tvIntruderAlert.visibility = View.GONE
             }
         }
+        try { NotificationHelper.showFaceRecognisedAlert(this, name) } catch (_: Exception) {}
         sendCameraEvent(CommandChannel.evtFace(name, true))
         logEvent("face_known", name, confidence, "normal")
     }
