@@ -74,9 +74,9 @@ class FaceDetectionManager(
                         landmarks = buildMap {
                             leftEye?.let  { put("leftEye",  Pair(it.x, it.y)) }
                             rightEye?.let { put("rightEye", Pair(it.x, it.y)) }
-                            face.getLandmark(FaceLandmark.NOSE_BASE)?.position?.let  { put("nose",       Pair(it.x, it.y)) }
-                            face.getLandmark(FaceLandmark.LEFT_MOUTH)?.position?.let { put("mouthLeft",  Pair(it.x, it.y)) }
-                            face.getLandmark(FaceLandmark.RIGHT_MOUTH)?.position?.let{ put("mouthRight", Pair(it.x, it.y)) }
+                            face.getLandmark(FaceLandmark.NOSE_BASE)?.position?.let   { put("nose",       Pair(it.x, it.y)) }
+                            face.getLandmark(FaceLandmark.MOUTH_LEFT)?.position?.let  { put("mouthLeft",  Pair(it.x, it.y)) }
+                            face.getLandmark(FaceLandmark.MOUTH_RIGHT)?.position?.let { put("mouthRight", Pair(it.x, it.y)) }
                         }
                     )
                 }
@@ -110,7 +110,6 @@ class FaceDetectionManager(
                 val leftEye  = face.getLandmark(FaceLandmark.LEFT_EYE)?.position
                 val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position
 
-                // Use eye-based alignment when landmarks are available
                 val crop = if (leftEye != null && rightEye != null) {
                     rm.cropAndAlignFace(
                         fullBitmap,
