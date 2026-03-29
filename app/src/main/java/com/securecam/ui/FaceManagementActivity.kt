@@ -2,7 +2,6 @@ package com.securecam.ui
 
 import android.app.AlertDialog
 import android.content.ContentValues
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -47,12 +46,11 @@ class FaceManagementActivity : AppCompatActivity() {
     private var pendingName = ""
     private var pendingCameraUri: Uri? = null
 
-    // ML Kit detector configured for high accuracy enrollment
     private val enrollDetector by lazy {
         val options = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-            .setMinFaceSize(0.10f)
+            .setMinFaceSize(0.08f)
             .build()
         FaceDetection.getClient(options)
     }
@@ -65,7 +63,7 @@ class FaceManagementActivity : AppCompatActivity() {
                     val bitmap = MediaStore.Images.Media.getBitmap(contentResolver, uri)
                     detectAndEnroll(bitmap)
                 } catch (e: Exception) {
-                    Toast.makeText(this, "Error loading image: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Error loading photo: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -76,9 +74,14 @@ class FaceManagementActivity : AppCompatActivity() {
             try {
                 val stream = contentResolver.openInputStream(it)
                 val bitmap = BitmapFactory.decodeStream(stream)
+                stream?.close()
+                if (bitmap == null) {
+                    Toast.makeText(this, "Could not decode image. Try a different photo.", Toast.LENGTH_LONG).show()
+                    return@let
+                }
                 detectAndEnroll(bitmap)
             } catch (e: Exception) {
-                Toast.makeText(this, "Error loading image: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Error loading image: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -130,14 +133,12 @@ class FaceManagementActivity : AppCompatActivity() {
                     return@setPositiveButton
                 }
                 pendingName = name
-
-                // Check if person already exists — offer to add another sample
                 val existing = faceDb.getAll().find { it.name == name }
                 if (existing != null) {
-                    val sampleCount = faceDb.getEmbeddingCount(name)
+                    val count = faceDb.getEmbeddingCount(name)
                     AlertDialog.Builder(this)
-                        .setTitle("$name already enrolled")
-                        .setMessage("$name has $sampleCount sample(s). Adding more photos improves accuracy (max 5).\n\nWhat would you like to do?")
+                        .setTitle("$name already enrolled ($count/5 samples)")
+                        .setMessage("Adding more photos improves accuracy.")
                         .setPositiveButton("Add another photo") { _, _ -> showImageSourceDialog() }
                         .setNegativeButton("Replace all") { _, _ ->
                             faceDb.deleteFace(name)
@@ -154,15 +155,11 @@ class FaceManagementActivity : AppCompatActivity() {
     }
 
     private fun showImageSourceDialog() {
-        val sampleCount = faceDb.getEmbeddingCount(pendingName)
-        val remaining = 5 - sampleCount
-        val hint = if (sampleCount > 0) " ($sampleCount/5 samples — $remaining more allowed)" else ""
-
-        val options = arrayOf("📷 Take Photo", "🖼️ Choose from Gallery")
+        val count = faceDb.getEmbeddingCount(pendingName)
+        val title = if (count > 0) "Photo for $pendingName ($count/5)" else "Photo for $pendingName"
         AlertDialog.Builder(this)
-            .setTitle("Photo for: $pendingName$hint")
-            .setMessage("Look directly at the camera. Good lighting improves accuracy.")
-            .setItems(options) { _, which ->
+            .setTitle(title)
+            .setItems(arrayOf("📷 Take Photo", "🖼️ Choose from Gallery")) { _, which ->
                 when (which) {
                     0 -> launchCamera()
                     1 -> pickImage.launch("image/*")
@@ -172,42 +169,75 @@ class FaceManagementActivity : AppCompatActivity() {
     }
 
     private fun launchCamera() {
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "face_${System.currentTimeMillis()}.jpg")
-            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+        try {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "face_${System.currentTimeMillis()}.jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            }
+            val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            if (uri == null) {
+                Toast.makeText(this, "Could not create camera file. Try Gallery instead.", Toast.LENGTH_LONG).show()
+                return
+            }
+            pendingCameraUri = uri
+            takePicture.launch(uri)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Camera error: ${e.message}", Toast.LENGTH_LONG).show()
         }
-        val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-        pendingCameraUri = uri
-        uri?.let { takePicture.launch(it) }
     }
 
     /**
-     * FIXED: Run ML Kit face detection on the enrollment image first.
-     * Crop and align the detected face before generating the embedding.
-     * Previously this used the raw full-image bitmap → garbage embeddings.
+     * Detect and enroll a face from [rawBitmap].
+     *
+     * Flow:
+     *  1. Run ML Kit face detection on the photo.
+     *  2. If a face is found → crop + align → generate embedding → save.
+     *  3. If NO face is found → offer the user a choice:
+     *       a. "Try another photo" (go back)
+     *       b. "Add anyway" → use a padded center crop as fallback.
+     *          This lets enrollment proceed even when ML Kit can't detect the face
+     *          (e.g. unusual lighting, heavy occlusion, very small face in the photo).
+     *          Recognition accuracy will be lower for this sample.
      */
     private fun detectAndEnroll(rawBitmap: Bitmap) {
-        Toast.makeText(this, "Detecting face for $pendingName…", Toast.LENGTH_SHORT).show()
+        if (rawBitmap.width == 0 || rawBitmap.height == 0) {
+            Toast.makeText(this, "Invalid image. Please try again.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Toast.makeText(this, "Analysing photo…", Toast.LENGTH_SHORT).show()
 
         val image = InputImage.fromBitmap(rawBitmap, 0)
         enrollDetector.process(image)
             .addOnSuccessListener { faces ->
                 if (faces.isEmpty()) {
-                    Toast.makeText(
-                        this,
-                        "⚠️ No face detected. Please use a clear, front-facing photo with good lighting.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    // ── No face detected — offer graceful fallback ──────────
+                    AlertDialog.Builder(this)
+                        .setTitle("⚠️ No face detected")
+                        .setMessage(
+                            "ML Kit couldn't find a face in this photo.\n\n" +
+                            "Tips for best results:\n" +
+                            "• Use a clear front-facing photo\n" +
+                            "• Good lighting, face unobstructed\n" +
+                            "• Face should fill most of the frame\n\n" +
+                            "You can still add this photo (lower accuracy) or try another."
+                        )
+                        .setPositiveButton("Try another photo") { _, _ -> showImageSourceDialog() }
+                        .setNegativeButton("Add anyway") { _, _ ->
+                            // Fallback: padded center crop
+                            val crop = centerCrop(rawBitmap)
+                            saveEmbedding(rawBitmap, crop, isFallback = true)
+                        }
+                        .show()
                     return@addOnSuccessListener
                 }
 
-                // Pick the largest detected face if multiple
+                // Pick the largest face if there are multiple
                 val face = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() }!!
-                val bb = face.boundingBox
+                val bb       = face.boundingBox
                 val leftEye  = face.getLandmark(FaceLandmark.LEFT_EYE)?.position
                 val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position
 
-                // Crop + align using eye landmarks when available
                 val faceCrop = if (leftEye != null && rightEye != null) {
                     recognitionManager.cropAndAlignFace(
                         rawBitmap,
@@ -218,57 +248,76 @@ class FaceManagementActivity : AppCompatActivity() {
                     recognitionManager.cropFace(rawBitmap, bb.left, bb.top, bb.right, bb.bottom)
                 }
 
-                lifecycleScope.launch {
-                    val embedding = withContext(Dispatchers.Default) {
-                        recognitionManager.generateEmbedding(faceCrop)
-                    }
-
-                    if (embedding == null) {
-                        Toast.makeText(
-                            this@FaceManagementActivity,
-                            "❌ Embedding failed — model not loaded. Check assets/mobilefacenet.tflite.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        return@launch
-                    }
-
-                    val currentCount = faceDb.getEmbeddingCount(pendingName)
-                    if (currentCount >= 5) {
-                        Toast.makeText(
-                            this@FaceManagementActivity,
-                            "⚠️ Maximum 5 samples reached for $pendingName. Delete and re-enroll to reset.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        return@launch
-                    }
-
-                    // Add the cropped face crop (not the full raw photo) to the database
-                    faceDb.addFace(pendingName, faceCrop, embedding)
-                    delay(500)
-                    loadFaces()
-
-                    val newCount = currentCount + 1
-                    val tip = when {
-                        newCount < 3 -> " Add ${3 - newCount} more for best accuracy."
-                        newCount == 3 -> " Good! You can add up to 2 more."
-                        else -> " Excellent coverage!"
-                    }
-                    Toast.makeText(
-                        this@FaceManagementActivity,
-                        "✅ Sample $newCount/5 added for $pendingName.$tip",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+                saveEmbedding(rawBitmap, faceCrop, isFallback = false)
             }
             .addOnFailureListener { e ->
-                Toast.makeText(this, "Detection error: ${e.message}", Toast.LENGTH_SHORT).show()
+                // ML Kit init failure — fall back gracefully rather than blocking
+                Toast.makeText(this, "Face detector unavailable: ${e.message}", Toast.LENGTH_SHORT).show()
+                val crop = centerCrop(rawBitmap)
+                saveEmbedding(rawBitmap, crop, isFallback = true)
             }
     }
 
+    /** Generate embedding and persist the face sample. */
+    private fun saveEmbedding(thumbnailBitmap: Bitmap, faceCrop: Bitmap, isFallback: Boolean) {
+        lifecycleScope.launch {
+            val currentCount = faceDb.getEmbeddingCount(pendingName)
+            if (currentCount >= 5) {
+                Toast.makeText(
+                    this@FaceManagementActivity,
+                    "⚠️ Max 5 samples reached for $pendingName. Delete and re-enroll to reset.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@launch
+            }
+
+            val embedding = withContext(Dispatchers.Default) {
+                recognitionManager.generateEmbedding(faceCrop)
+            }
+
+            if (embedding == null && !isFallback) {
+                Toast.makeText(
+                    this@FaceManagementActivity,
+                    "❌ Model not loaded — check assets/mobilefacenet.tflite",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@launch
+            }
+
+            // Use the cropped face as thumbnail for enrolled view, raw for storage
+            faceDb.addFace(pendingName, faceCrop, embedding)
+            delay(400)
+            loadFaces()
+
+            val newCount = currentCount + 1
+            val quality  = if (isFallback || embedding == null) " (⚠️ fallback — lower accuracy)" else ""
+            val tip = when {
+                newCount < 3 -> " Add ${3 - newCount} more for best accuracy."
+                newCount == 3 -> " Good. 2 more allowed."
+                newCount >= 5 -> " Full coverage!"
+                else -> ""
+            }
+            Toast.makeText(
+                this@FaceManagementActivity,
+                "✅ Sample $newCount/5 saved for $pendingName$quality.$tip",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    /** Padded center crop fallback when face detection fails. */
+    private fun centerCrop(bitmap: Bitmap): Bitmap {
+        val size = minOf(bitmap.width, bitmap.height)
+        val x    = (bitmap.width  - size) / 2
+        val y    = (bitmap.height - size) / 4  // slightly above center — typical face position
+        return Bitmap.createBitmap(bitmap, x, y, size, size)
+    }
+
     private fun showDeleteDialog(person: KnownPerson) {
+        val count = faceDb.getEmbeddingCount(person.name)
         AlertDialog.Builder(this)
             .setTitle("Remove ${person.name}?")
-            .setMessage("This will permanently remove all ${faceDb.getEmbeddingCount(person.name)} sample(s) for this person.")
+            .setMessage("This removes all $count sample(s) for this person.")
             .setPositiveButton("Remove") { _, _ ->
                 faceDb.deleteFace(person.name)
                 lifecycleScope.launch { delay(300); loadFaces() }
@@ -285,7 +334,7 @@ class FaceManagementActivity : AppCompatActivity() {
     }
 }
 
-// ── RecyclerView Adapter ──────────────────────────────────────────────────────
+// ── Adapter ───────────────────────────────────────────────────────────────────
 
 class FaceAdapter(
     private var persons: List<KnownPerson>,
