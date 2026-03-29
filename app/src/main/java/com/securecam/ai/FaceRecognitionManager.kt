@@ -14,12 +14,13 @@ import java.nio.channels.FileChannel
 import kotlin.math.*
 
 /**
- * FaceRecognitionManager v3:
- * - numThreads bumped from 2 → 4 (30–50% latency reduction on most SoCs)
- * - XNNPACK delegate explicitly enabled for SIMD-accelerated float32 inference
+ * FaceRecognitionManager v4:
+ * - tryLoadFromAssets: switched from openFd+mmap → assets.open().readBytes()
+ *   (mmap via openFd fails silently on some OEMs / API levels)
+ * - catch(Throwable) instead of catch(Exception) so native errors are logged
+ * - useXNNPACK disabled (XNNPACK explicit flag causes crashes on some ABIs;
+ *   TFLite 2.x enables it by default anyway when supported)
  * - Supports MobileFaceNet (128-dim) and ArcFace (512-dim)
- * - cropAndAlignFace: eye-landmark-based rotation alignment
- * - generateEmbedding returns L2-normalized vector
  */
 class FaceRecognitionManager(private val context: Context) {
 
@@ -44,7 +45,7 @@ class FaceRecognitionManager(private val context: Context) {
                 if (arcInterp != null) {
                     interpreter = arcInterp
                     embeddingSize = 512
-                    Log.d(TAG, "Loaded ArcFace (512-dim), threads=4, XNNPACK")
+                    Log.d(TAG, "Loaded ArcFace (512-dim)")
                 } else {
                     Log.w(TAG, "ArcFace not found — falling back to MobileFaceNet")
                     interpreter = tryLoad(MOBILEFACENET_NAME, opts)
@@ -54,33 +55,40 @@ class FaceRecognitionManager(private val context: Context) {
             else -> {
                 interpreter = tryLoad(MOBILEFACENET_NAME, opts)
                 embeddingSize = 128
-                Log.d(TAG, if (interpreter != null) "Loaded MobileFaceNet (128-dim), threads=4, XNNPACK" else "No TFLite model found")
+                Log.d(TAG, if (interpreter != null) "Loaded MobileFaceNet (128-dim)" else "No TFLite model found")
             }
         }
     }
 
     /**
-     * Build TFLite options:
-     *  - 4 threads: modern Android SoCs have ≥4 big cores; 4 threads is the
-     *    sweet spot for TFLite float32 inference without over-subscribing.
-     *  - useXNNPack: SIMD-accelerated (ARM NEON / x86 AVX) float32 ops.
-     *    Enabled by default in TFLite 2.x but explicit flag ensures it.
+     * 4 threads for inference performance.
+     * useXNNPACK = false: the explicit flag crashes on some ABIs.
+     * TFLite 2.x auto-enables XNNPACK when the device supports it.
      */
     private fun buildInterpreterOptions(): Interpreter.Options =
         Interpreter.Options().apply {
             numThreads = 4
-            useXNNPACK = true   // explicit SIMD acceleration
+            useXNNPACK = false
         }
 
     private fun tryLoad(name: String, opts: Interpreter.Options): Interpreter? =
         tryLoadFromAssets(name, opts) ?: tryLoadFromFiles(name, opts)
 
+    /**
+     * Load model from assets using assets.open() + readBytes().
+     * More compatible than openFd + memory-mapping, which fails silently
+     * on certain OEM ROMs and API levels.
+     * Catches Throwable (not just Exception) so UnsatisfiedLinkError and
+     * other native failures are logged rather than swallowed.
+     */
     private fun tryLoadFromAssets(name: String, opts: Interpreter.Options): Interpreter? = try {
-        val afd = context.assets.openFd(name)
-        val buf = FileInputStream(afd.fileDescriptor).channel
-            .map(FileChannel.MapMode.READ_ONLY, afd.startOffset, afd.declaredLength)
+        val bytes = context.assets.open(name).use { it.readBytes() }
+        val buf   = ByteBuffer.wrap(bytes)
         Interpreter(buf, opts)
-    } catch (e: Exception) { null }
+    } catch (e: Throwable) {
+        Log.e(TAG, "tryLoadFromAssets($name) failed: ${e.javaClass.simpleName}: ${e.message}")
+        null
+    }
 
     private fun tryLoadFromFiles(name: String, opts: Interpreter.Options): Interpreter? = try {
         val file = File(context.filesDir, name)
@@ -90,7 +98,10 @@ class FaceRecognitionManager(private val context: Context) {
                 .map(FileChannel.MapMode.READ_ONLY, 0, file.length())
             Interpreter(buf, opts)
         }
-    } catch (e: Exception) { null }
+    } catch (e: Throwable) {
+        Log.e(TAG, "tryLoadFromFiles($name) failed: ${e.javaClass.simpleName}: ${e.message}")
+        null
+    }
 
     /**
      * Generate L2-normalized embedding.
@@ -134,17 +145,6 @@ class FaceRecognitionManager(private val context: Context) {
         return if (norm > 1e-6f) FloatArray(v.size) { v[it] / norm } else v
     }
 
-    /**
-     * Crop and align a face using eye landmark positions.
-     *
-     * Steps:
-     * 1. Expand the bounding box by [padding] on each side so hair/chin are included
-     *    (face recognition models expect some context around the face).
-     * 2. Compute the angle between the two eyes and rotate to make them horizontal.
-     *    This is the single biggest accuracy improvement for non-frontal faces.
-     *
-     * Skip rotation if tilt < 1.5° (negligible) to avoid unnecessary Bitmap allocation.
-     */
     fun cropAndAlignFace(
         bitmap: Bitmap,
         left: Int, top: Int, right: Int, bottom: Int,
@@ -167,7 +167,7 @@ class FaceRecognitionManager(private val context: Context) {
         val eyeDy = rightEyeY - leftEyeY
         val angleDeg = Math.toDegrees(atan2(eyeDy.toDouble(), eyeDx.toDouble())).toFloat()
 
-        if (abs(angleDeg) < 1.5f) return cropped   // negligible tilt, skip rotation
+        if (abs(angleDeg) < 1.5f) return cropped
 
         return try {
             val matrix = Matrix().apply { postRotate(-angleDeg, cw / 2f, ch / 2f) }
@@ -175,7 +175,6 @@ class FaceRecognitionManager(private val context: Context) {
         } catch (e: Exception) { cropped }
     }
 
-    /** Crop without alignment (fallback when eye landmarks unavailable) */
     fun cropFace(
         bitmap: Bitmap,
         left: Int, top: Int, right: Int, bottom: Int,
